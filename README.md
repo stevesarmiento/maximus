@@ -3,7 +3,7 @@
 Maximus is an autonomous agent for onchain asset analysis and transaction execution. It thinks, plans, and learns as it works, performing comprehensive analysis using task planning, self-reflection, and real-time market data. Think Claude Code, but built specifically for onchain operations.
 
 
-<img width="979" height="651" alt="Screenshot 2025-10-14 at 6 12 35 PM" src="https://github.com/user-attachments/assets/5a2859d4-53cf-4638-998a-15cef3c98038" />
+<img width="979" height="651" alt="Maximus - Autonomous agent for onchain asset analysis" src="./assets/github-header.png" />
 
 ## Overview
 
@@ -16,11 +16,9 @@ It's not just another chatbot. It's an agent that plans ahead, verifies its prog
 - **Autonomous Execution**: Selects and executes the right tools for analysis and transaction operations
 - **Self-Validation**: Checks its own work and iterates until tasks are complete
 - **Conversational Memory**: Remembers past queries within a session using Capi memory API
-- **Real-Time Onchain Data**: Access to prices, market data, OHLC charts, and asset information from CoinGecko
-- **Flexible Identifiers**: Supports both CoinGecko IDs (bitcoin, ethereum) and ticker symbols (BTC, ETH)
-- **Safety Features**: Built-in loop detection and step limits to prevent runaway execution
+- **Real-Time Asset Data**: Access to prices, market data, OHLC charts, and asset information from CoinGecko
 
-[![Twitter Follow](https://img.shields.io/twitter/follow/virattt?style=social)](https://twitter.com/virattt)
+[![Twitter Follow](https://img.shields.io/twitter/follow/stevensarmi_?style=social)](https://twitter.com/stevensarmi_)
 
 ### Prerequisites
 
@@ -58,7 +56,7 @@ cp env.example .env
 
 Run Maximus in interactive mode:
 ```bash
-uv run maximus-agent
+uv run maximus
 ```
 
 ### Example Queries
@@ -94,7 +92,7 @@ Maximus has conversational memory powered by Capi, allowing it to remember and r
 ```
 
 **Memory commands:**
-- `/clear-mem` or `/clear-memory` - Delete all memories from the current session using Capi's forgetMemory API
+- `/clear` - Delete all memories from the current session using Capi's forgetMemory API
 - `exit` or `quit` - Exit Maximus (memories are automatically deleted)
 
 **Note:** Memory is session-based. Each time you start Maximus, you get a fresh session with no memory from previous runs. When you exit or use `/clear-mem`, memories are permanently deleted from Capi's storage.
