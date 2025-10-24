@@ -14,8 +14,7 @@ import {
 import { clusterApiUrl } from "@solana/web3.js";
 import WalletConnect from "./wallet-connect";
 import WalletList from "./wallet-list";
-
-require("@solana/wallet-adapter-react-ui/styles.css");
+import "@solana/wallet-adapter-react-ui/styles.css";
 
 interface Wallet {
   address: string;

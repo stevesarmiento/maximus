@@ -36,3 +36,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# turbopack
+.turbo
+
+# bun
+bun.lockb
