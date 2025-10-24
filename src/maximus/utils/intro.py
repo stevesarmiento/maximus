@@ -28,15 +28,15 @@ def check_api_status():
     
     # Check OpenAI API key
     if openai_key and len(openai_key) > 0:
-        statuses.append(("OpenAI API", "✓", "\033[92m"))  # Green
+        statuses.append(("OpenAI API", " ✓", "\033[92m"))  # Green
     else:
-        statuses.append(("OpenAI API", "✗", "\033[91m"))  # Red
+        statuses.append(("OpenAI API", " ✗", "\033[91m"))  # Red
     
     # Check CoinGecko API key
     if coingecko_key and len(coingecko_key) > 0:
-        statuses.append(("CoinGecko API", "✓", "\033[92m"))  # Green
+        statuses.append(("CoinGecko API", " ✓", "\033[92m"))  # Green
     else:
-        statuses.append(("CoinGecko API", "✗", "\033[91m"))  # Red
+        statuses.append(("CoinGecko API", " ✗", "\033[91m"))  # Red
     
     return statuses
 
@@ -69,7 +69,7 @@ def print_intro(session_id: str = None):
     
     # Session info
     if session_id:
-        print(f"{GREEN}✓{RESET} {DIM}Session initialized (ID: {session_id[:8]}){RESET}")
+        print(f"{GREEN} ✓{RESET} {DIM}Session initialized (ID: {session_id[:8]}){RESET}")
     
     # API connection status
     api_statuses = check_api_status()
