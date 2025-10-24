@@ -4,6 +4,8 @@ from solana.rpc.api import Client
 from solders.pubkey import Pubkey
 from solders.signature import Signature
 import requests
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class SolanaClient:
@@ -100,9 +102,22 @@ class SolanaClient:
         except Exception as e:
             raise Exception(f"Failed to get token accounts for {address}: {str(e)}")
     
+    @lru_cache(maxsize=1000)
     def get_token_metadata(self, mint_address: str) -> Dict[str, Any]:
         """
-        Get token metadata from Helius DAS API.
+        Get token metadata from Helius DAS API with LRU caching.
+        
+        Args:
+            mint_address: Token mint address
+            
+        Returns:
+            Token metadata including symbol, name, decimals
+        """
+        return self._fetch_token_metadata(mint_address)
+    
+    def _fetch_token_metadata(self, mint_address: str) -> Dict[str, Any]:
+        """
+        Internal method to fetch token metadata from Helius DAS API.
         
         Args:
             mint_address: Token mint address
@@ -112,9 +127,6 @@ class SolanaClient:
         """
         try:
             # Use Helius DAS API for token metadata
-            # Extract base URL from RPC URL
-            base_url = self.rpc_url.replace("?api-key=", "/v0/token-metadata?api-key=")
-            
             response = requests.post(
                 self.rpc_url,
                 json={
@@ -158,6 +170,47 @@ class SolanaClient:
                 'decimals': 0,
                 'mint': mint_address,
             }
+    
+    def get_token_metadata_batch(self, mint_addresses: List[str], max_workers: int = 10) -> Dict[str, Dict[str, Any]]:
+        """
+        Get token metadata for multiple mints in parallel with caching.
+        
+        Args:
+            mint_addresses: List of token mint addresses
+            max_workers: Maximum number of concurrent requests (default: 10)
+            
+        Returns:
+            Dictionary mapping mint address to metadata
+        """
+        if not mint_addresses:
+            return {}
+        
+        metadata_map = {}
+        
+        # Use ThreadPoolExecutor for parallel fetching
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks - get_token_metadata uses LRU cache
+            future_to_mint = {
+                executor.submit(self.get_token_metadata, mint): mint 
+                for mint in mint_addresses
+            }
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_mint):
+                mint = future_to_mint[future]
+                try:
+                    metadata = future.result()
+                    metadata_map[mint] = metadata
+                except Exception as e:
+                    # Fall back to empty metadata for failed mints
+                    metadata_map[mint] = {
+                        'symbol': 'UNKNOWN',
+                        'name': 'Unknown Token',
+                        'decimals': 0,
+                        'mint': mint,
+                    }
+        
+        return metadata_map
     
     def get_recent_transactions(self, address: str, limit: int = 10) -> List[Dict[str, Any]]:
         """

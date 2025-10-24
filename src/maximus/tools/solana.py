@@ -76,8 +76,10 @@ def get_wallet_balances(
                 # Get SPL token accounts
                 token_accounts = client.get_token_accounts(address)
                 
-                # Enrich token accounts with metadata
-                tokens = []
+                # Filter accounts based on balance and collect mints
+                filtered_accounts = []
+                mints_to_fetch = []
+                
                 for account in token_accounts:
                     ui_amount = account.get('ui_amount', 0)
                     
@@ -86,13 +88,29 @@ def get_wallet_balances(
                         continue
                     
                     mint = account.get('mint')
-                    metadata = client.get_token_metadata(mint) if mint else {}
+                    if mint:
+                        mints_to_fetch.append(mint)
+                    filtered_accounts.append(account)
+                
+                # Batch fetch metadata for all mints
+                metadata_map = client.get_token_metadata_batch(mints_to_fetch)
+                
+                # Build tokens list using metadata mapping
+                tokens = []
+                for account in filtered_accounts:
+                    mint = account.get('mint')
+                    metadata = metadata_map.get(mint, {
+                        'symbol': 'UNKNOWN',
+                        'name': 'Unknown Token',
+                        'decimals': 0,
+                        'mint': mint,
+                    })
                     
                     tokens.append({
                         'symbol': metadata.get('symbol', 'UNKNOWN'),
                         'name': metadata.get('name', 'Unknown Token'),
                         'mint': mint,
-                        'balance': ui_amount,
+                        'balance': account.get('ui_amount', 0),
                         'decimals': account.get('decimals', 0),
                     })
                 
@@ -260,11 +278,26 @@ def get_token_accounts(wallet_address: Optional[str] = None) -> dict:
                 # Get SPL token accounts
                 token_accounts = client.get_token_accounts(address)
                 
-                # Enrich with metadata
+                # Collect all mints for batch fetching
+                mints_to_fetch = [
+                    account.get('mint') 
+                    for account in token_accounts 
+                    if account.get('mint')
+                ]
+                
+                # Batch fetch metadata for all mints
+                metadata_map = client.get_token_metadata_batch(mints_to_fetch)
+                
+                # Build accounts list using metadata mapping
                 accounts = []
                 for account in token_accounts:
                     mint = account.get('mint')
-                    metadata = client.get_token_metadata(mint) if mint else {}
+                    metadata = metadata_map.get(mint, {
+                        'symbol': 'UNKNOWN',
+                        'name': 'Unknown Token',
+                        'decimals': 0,
+                        'mint': mint,
+                    }) if mint else {}
                     
                     accounts.append({
                         'mint': mint,

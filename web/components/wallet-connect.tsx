@@ -2,7 +2,7 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface WalletConnectProps {
   onConnect: (address: string) => Promise<boolean>;
@@ -15,14 +15,9 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (connected && publicKey) {
-      handleAddWallet();
-    }
-  }, [connected, publicKey]);
-
-  const handleAddWallet = async () => {
+  const handleAddWallet = useCallback(async () => {
     if (!publicKey) return;
 
     setIsAdding(true);
@@ -44,9 +39,29 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
 
     setIsAdding(false);
 
+    // Clear any existing timeout before setting a new one
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current);
+    }
+
     // Clear message after 5 seconds
-    setTimeout(() => setMessage(null), 5000);
-  };
+    messageTimeoutRef.current = setTimeout(() => setMessage(null), 5000);
+  }, [publicKey, onConnect]);
+
+  useEffect(() => {
+    if (connected && publicKey) {
+      handleAddWallet();
+    }
+  }, [connected, publicKey, handleAddWallet]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="border border-border-low rounded-lg p-8">

@@ -76,7 +76,7 @@ class WalletStorage:
         
         # Create new wallet config
         wallet = WalletConfig(address=address, label=label)
-        wallets.append(wallet.dict())
+        wallets.append(wallet.model_dump(exclude_none=True))
         
         config["wallets"] = wallets
         self._write_config(config)
