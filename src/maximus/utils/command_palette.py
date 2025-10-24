@@ -39,6 +39,8 @@ class CommandPalette:
         
         # Define available commands
         self.commands = [
+            Command("/balances", ["bal", "wallet"], "Show Solana wallet balances"),
+            Command("/transactions", ["txs", "history"], "Show recent Solana transactions"),
             Command("/clear", ["reset"], "Clear conversation memory"),
             Command("/config", ["settings"], "Open configuration settings"),
             Command("/cost", ["usage", "billing"], "Show session cost and duration"),

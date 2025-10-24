@@ -57,6 +57,10 @@ def execute_command(command_name: str, state: AppState) -> str:
     if command_name == "/clear":
         clear_memories(state.session_id)
         return "Memory cleared"
+    elif command_name == "/balances":
+        return execute_balances_command()
+    elif command_name == "/transactions":
+        return execute_transactions_command()
     elif command_name == "/config":
         return "Configuration panel (coming soon)"
     elif command_name == "/cost":
@@ -65,6 +69,100 @@ def execute_command(command_name: str, state: AppState) -> str:
         state.should_exit = True
         return "Goodbye!"
     return None
+
+
+def execute_balances_command() -> str:
+    """Execute the /balances command to show wallet balances."""
+    from maximus.tools.solana import get_wallet_balances
+    from maximus.utils.ui import Colors
+    
+    try:
+        result = get_wallet_balances.invoke({})
+        
+        if not result.get("success", False):
+            return f"{Colors.RED}Error:{Colors.ENDC} {result.get('error', 'Unknown error')}"
+        
+        wallets = result.get("wallets", [])
+        if not wallets:
+            return f"{Colors.YELLOW}No approved wallets found.{Colors.ENDC}\nPlease connect a wallet via the web dashboard."
+        
+        output_lines = [f"\n{Colors.BOLD}Wallet Balances:{Colors.ENDC}\n"]
+        
+        for wallet in wallets:
+            if "error" in wallet:
+                output_lines.append(f"{Colors.RED}Error for {wallet['wallet_label']}:{Colors.ENDC} {wallet['error']}\n")
+                continue
+            
+            label = wallet.get("wallet_label", "Unknown")
+            address = wallet.get("wallet_address", "")
+            sol_balance = wallet.get("sol_balance", 0)
+            tokens = wallet.get("tokens", [])
+            
+            output_lines.append(f"{Colors.LIGHT_ORANGE}{label}{Colors.ENDC} ({address[:8]}...{address[-8:]})")
+            output_lines.append(f"  SOL: {Colors.BOLD}{sol_balance:.4f}{Colors.ENDC}")
+            
+            if tokens:
+                output_lines.append(f"  Tokens ({len(tokens)}):")
+                for token in tokens:
+                    symbol = token.get("symbol", "UNKNOWN")
+                    balance = token.get("balance", 0)
+                    output_lines.append(f"    • {symbol}: {balance:,.4f}")
+            else:
+                output_lines.append(f"  {Colors.DIM}No tokens found{Colors.ENDC}")
+            
+            output_lines.append("")
+        
+        return "\n".join(output_lines)
+    
+    except Exception as e:
+        return f"{Colors.RED}Error executing /balances:{Colors.ENDC} {str(e)}"
+
+
+def execute_transactions_command(limit: int = 10) -> str:
+    """Execute the /transactions command to show recent transactions."""
+    from maximus.tools.solana import get_transaction_history
+    from maximus.utils.ui import Colors
+    from datetime import datetime
+    
+    try:
+        result = get_transaction_history.invoke({"limit": limit})
+        
+        if not result.get("success", False):
+            return f"{Colors.RED}Error:{Colors.ENDC} {result.get('error', 'Unknown error')}"
+        
+        transactions = result.get("transactions", [])
+        wallet_label = result.get("wallet_label", "Unknown")
+        wallet_address = result.get("wallet_address", "")
+        
+        if not transactions:
+            return f"{Colors.YELLOW}No transactions found for {wallet_label}.{Colors.ENDC}"
+        
+        output_lines = [f"\n{Colors.BOLD}Recent Transactions for {wallet_label}:{Colors.ENDC}"]
+        output_lines.append(f"{Colors.DIM}{wallet_address}{Colors.ENDC}\n")
+        
+        for i, tx in enumerate(transactions, 1):
+            signature = tx.get("signature", "")
+            status = tx.get("status", "Unknown")
+            timestamp = tx.get("timestamp")
+            
+            # Format timestamp
+            if timestamp:
+                dt = datetime.fromtimestamp(timestamp)
+                time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                time_str = "Unknown time"
+            
+            # Color status
+            status_color = Colors.GREEN if status == "Success" else Colors.RED
+            
+            output_lines.append(f"{i}. {Colors.LIGHT_ORANGE}{signature[:16]}...{signature[-16:]}{Colors.ENDC}")
+            output_lines.append(f"   Status: {status_color}{status}{Colors.ENDC} | Time: {time_str}")
+            output_lines.append("")
+        
+        return "\n".join(output_lines)
+    
+    except Exception as e:
+        return f"{Colors.RED}Error executing /transactions:{Colors.ENDC} {str(e)}"
 
 
 def create_application(state: AppState):
