@@ -44,7 +44,7 @@ uv sync
 3. Set up your environment variables:
 ```bash
 # Copy the example environment file
-cp env.example .env
+cp .env.example .env
 
 # Edit .env and add your API keys
 # OPENAI_API_KEY=your-openai-api-key
@@ -128,19 +128,29 @@ Maximus has access to the following onchain data and analysis tools:
 
 ```
 maximus/
+├── assets/              # Images and visual assets
+├── examples/            # Demo and integration examples
+├── tests/               # Test files
 ├── src/
-│   ├── maximus/
-│   │   ├── agent.py      # Main agent orchestration logic
-│   │   ├── model.py      # LLM interface
-│   │   ├── prompts.py    # System prompts for each component
-│   │   ├── schemas.py    # Pydantic models
-│   │   ├── tools/        # Onchain data and analysis tools
-│   │   │   ├── api.py    # CoinGecko API client
-│   │   │   ├── prices.py # Price and OHLC data tools
-│   │   │   ├── market.py # Market overview tools
-│   │   │   └── info.py   # Asset information tools
-│   │   ├── utils/        # Utility functions
-│   │   └── cli.py        # CLI entry point
+│   └── maximus/
+│       ├── agent.py      # Main agent orchestration logic
+│       ├── model.py      # LLM interface
+│       ├── prompts.py    # System prompts for each component
+│       ├── schemas.py    # Pydantic models
+│       ├── tools/        # Onchain data and analysis tools
+│       │   ├── api.py    # CoinGecko API client
+│       │   ├── prices.py # Price and OHLC data tools
+│       │   ├── market.py # Market overview tools
+│       │   ├── memory.py # Capi memory integration
+│       │   └── info.py   # Asset information tools
+│       └── utils/        # Utility functions
+│           ├── charts.py
+│           ├── command_palette.py
+│           ├── intro.py
+│           ├── logger.py
+│           ├── status_bar.py
+│           └── ui.py
+├── .env.example
 ├── pyproject.toml
 └── uv.lock
 ```
