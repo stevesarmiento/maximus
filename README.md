@@ -81,6 +81,13 @@ Try asking Maximus questions like:
 - "Show me my recent Solana transactions"
 - "What's my SOL balance?"
 
+**Solana Transactions (requires delegation setup):**
+- "Send 0.5 SOL to <address>"
+- "Swap 10 USDC for SOL"
+- "Transfer tokens to another wallet"
+- `/delegate` - View delegation status
+- `/revoke` - Revoke delegation
+
 Maximus will automatically:
 1. Break down your request into actionable tasks
 2. Fetch the necessary onchain data
@@ -138,6 +145,44 @@ Maximus can query your Solana wallets for balances, tokens, and transaction hist
 - Terminal queries on-chain data via Helius RPC
 - Web dashboard manages wallet approvals securely
 
+### Transaction Signing with Delegation
+
+Maximus can autonomously sign transactions within delegated limits:
+
+**Setup:**
+1. Visit [http://localhost:3000/delegate](http://localhost:3000/delegate)
+
+2. Connect your wallet and set limits:
+   - Max SOL per transaction (e.g., 1.0 SOL)
+   - Max tokens per transaction (e.g., 100)
+   - Duration (e.g., 24 hours)
+
+3. Create a password to encrypt the delegate wallet
+
+4. Delegation saved! Terminal can now sign transactions
+
+**Usage:**
+```bash
+# Check delegation
+>> /delegate
+
+# Send SOL
+>> Send 0.5 SOL to <address>
+
+# Swap tokens
+>> Swap 25 USDC for SOL
+
+# Revoke delegation
+>> /revoke
+```
+
+**Security:**
+- Delegate wallet encrypted with your password
+- Time-limited (expires automatically)
+- Spending limits enforced
+- Revocable at any time
+- See [DELEGATION_GUIDE.md](DELEGATION_GUIDE.md) for details
+
 ## Architecture
 
 Maximus uses a multi-agent architecture with specialized components:
@@ -169,6 +214,9 @@ Maximus has access to the following onchain data and analysis tools:
 - `get_wallet_balances`: Get SOL and SPL token balances for approved wallets
 - `get_transaction_history`: Fetch recent transaction history
 - `get_token_accounts`: Get detailed token account information
+- `send_sol`: Send SOL using delegated wallet
+- `send_token`: Send SPL tokens using delegated wallet
+- `swap_tokens`: Swap tokens via Jupiter aggregator
 
 ## Project Structure
 

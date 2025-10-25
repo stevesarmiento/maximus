@@ -19,6 +19,8 @@ dependencies = [
     "requests>=2.32.5",
     "solana>=0.35.0",
     "solders>=0.22.0",
+    "cryptography>=42.0.0",
+    "base58>=2.1.1",
 ]
 
 [project.scripts]
