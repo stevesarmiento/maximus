@@ -180,14 +180,14 @@ function TokenApprovalContent() {
   return (
     <div className="space-y-8">
       {/* Wallet Connection */}
-      <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
+      <div className="bg-sand-1400 rounded-lg border border-sand-1200 p-6">
         <h2 className="text-2xl font-semibold mb-4">1. Connect Main Wallet</h2>
-        <p className="text-gray-400 mb-6">
+        <p className="text-sand-500 mb-6">
           Connect the wallet containing the tokens you want to approve
         </p>
         <WalletMultiButton className="!bg-orange-500 hover:!bg-orange-600 !rounded-lg" />
         {connected && publicKey && (
-          <div className="mt-4 text-sm text-gray-400">
+          <div className="mt-4 text-sm text-sand-500">
             Connected: {publicKey.toBase58().slice(0, 8)}...
             {publicKey.toBase58().slice(-8)}
           </div>
@@ -196,12 +196,12 @@ function TokenApprovalContent() {
 
       {/* Token Selection */}
       {connected && (
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
+        <div className="bg-sand-1400 rounded-lg border border-sand-1200 p-6">
           <h2 className="text-2xl font-semibold mb-4">2. Select Token & Amount</h2>
           
           {delegateAddress && (
-            <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-              <p className="text-sm text-gray-400">Delegate Wallet:</p>
+            <div className="mb-4 p-3 bg-sand-1300 rounded-lg">
+              <p className="text-sm text-sand-500">Delegate Wallet:</p>
               <p className="font-mono text-xs text-orange-400">{delegateAddress}</p>
             </div>
           )}
@@ -212,7 +212,7 @@ function TokenApprovalContent() {
               <select
                 value={selectedToken}
                 onChange={(e) => setSelectedToken(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-sand-1300 border border-sand-1100 rounded-lg px-4 py-2 text-sand-100"
               >
                 <option value="">Select a token...</option>
                 {tokens.map((token) => (
@@ -233,10 +233,10 @@ function TokenApprovalContent() {
                 min="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-sand-1300 border border-sand-1100 rounded-lg px-4 py-2 text-sand-100"
                 placeholder="Enter amount"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-sand-600 mt-1">
                 Maximum amount delegate can spend from your wallet
               </p>
             </div>
@@ -244,7 +244,7 @@ function TokenApprovalContent() {
             <button
               onClick={handleApprove}
               disabled={loading || !selectedToken || !amount || !delegateAddress}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-sand-1100 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors"
             >
               {loading ? "Approving..." : "Approve Token Delegation"}
             </button>

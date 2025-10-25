@@ -1,81 +1,76 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Navigation } from "@/components/navigation";
+import { HeroSection } from "@/components/hero-section";
+import { ContentSection } from "@/components/content-section";
+import { HowItWorks } from "@/components/how-it-works";
+import { InfoBox, SecurityNote } from "@/components/info-box";
+import { FooterSection } from "@/components/footer-section";
 
 const DelegationManager = dynamic(() => import("@/components/delegation-manager"), {
   ssr: false,
 });
 
+const delegationSteps = [
+  {
+    number: 1,
+    description: 'Set spending limits (max SOL and tokens per transaction)',
+  },
+  {
+    number: 2,
+    description: 'Choose duration (delegation expires automatically)',
+  },
+  {
+    number: 3,
+    description: 'Create password to encrypt the delegate wallet',
+  },
+  {
+    number: 4,
+    description: 'Terminal can now sign transactions within your limits',
+  },
+];
+
 export default function DelegatePage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900">
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
-              Delegate to Terminal
-            </h1>
-            <p className="text-gray-400 text-lg">
-              Create a delegate wallet for autonomous transaction signing in the terminal
-            </p>
-          </div>
+    <div className="min-h-screen bg-bg1 overflow-x-clip relative">
+      {/* Gradient from top to bottom */}
+      <div className="absolute top-0 left-0 right-0 h-[600px] bg-gradient-to-b from-sand-1400/30 to-transparent pointer-events-none z-0" />
+      
+      <Navigation />
+      
+      <div className="relative z-10">
+        <div className="max-w-7xl mx-auto border-r border-l border-border-low">
+          <HeroSection 
+            title="Delegate to Terminal"
+            description="Create a delegate wallet for autonomous transaction signing in the terminal"
+          />
 
-          <DelegationManager />
+          <ContentSection>
+            <DelegationManager />
 
-          <div className="mt-12 p-6 bg-gray-900 rounded-lg border border-gray-800">
-            <h2 className="text-xl font-semibold mb-4">How Delegation Works</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>
-                Delegation allows the Maximus terminal to sign transactions on your behalf
-                within predefined limits. Your main wallet retains full control.
-              </p>
-              <ol className="space-y-3">
-                <li className="flex items-start">
-                  <span className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">
-                    1
-                  </span>
-                  <span>
-                    Set spending limits (max SOL and tokens per transaction)
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">
-                    2
-                  </span>
-                  <span>
-                    Choose duration (delegation expires automatically)
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">
-                    3
-                  </span>
-                  <span>
-                    Create password to encrypt the delegate wallet
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">
-                    4
-                  </span>
-                  <span>
-                    Terminal can now sign transactions within your limits
-                  </span>
-                </li>
-              </ol>
-              <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-800 rounded-lg">
-                <h3 className="font-semibold text-yellow-400 mb-2">Security Note</h3>
-                <p className="text-sm">
-                  The delegate wallet is stored encrypted on your computer.
-                  You can revoke the delegation at any time using{" "}
-                  <code className="bg-gray-800 px-2 py-1 rounded">/revoke</code> in the terminal.
+            <InfoBox title="How Delegation Works">
+              <div className="space-y-6 text-sand-500">
+                <p className="text-body-l">
+                  Delegation allows the Maximus terminal to sign transactions on your behalf
+                  within predefined limits. Your main wallet retains full control.
                 </p>
+                <HowItWorks steps={delegationSteps} title="" />
+                <SecurityNote>
+                  <p>
+                    The delegate wallet is stored encrypted on your computer.
+                    You can revoke the delegation at any time using{" "}
+                    <code className="font-berkeley-mono text-xs">/revoke</code> in the terminal.
+                  </p>
+                </SecurityNote>
               </div>
-            </div>
-          </div>
+            </InfoBox>
+          </ContentSection>
+
+          <FooterSection />
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 

@@ -137,14 +137,14 @@ function DelegationContent() {
   return (
     <div className="space-y-8">
       {/* Wallet Connection */}
-      <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
+      <div className="bg-sand-1400 rounded-lg border border-sand-1200 p-6">
         <h2 className="text-2xl font-semibold mb-4">1. Connect Wallet</h2>
-        <p className="text-gray-400 mb-6">
+        <p className="text-sand-500 mb-6">
           Connect the wallet you want to delegate from
         </p>
         <WalletMultiButton className="!bg-orange-500 hover:!bg-orange-600 !rounded-lg" />
         {connected && publicKey && (
-          <div className="mt-4 text-sm text-gray-400">
+          <div className="mt-4 text-sm text-sand-500">
             Connected: {publicKey.toBase58().slice(0, 8)}...
             {publicKey.toBase58().slice(-8)}
           </div>
@@ -153,7 +153,7 @@ function DelegationContent() {
 
       {/* Delegation Settings */}
       {connected && (
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
+        <div className="bg-sand-1400 rounded-lg border border-sand-1200 p-6">
           <h2 className="text-2xl font-semibold mb-4">2. Set Delegation Limits</h2>
           <div className="space-y-4">
             <div>
@@ -166,9 +166,9 @@ function DelegationContent() {
                 min="0.01"
                 value={maxSolPerTx}
                 onChange={(e) => setMaxSolPerTx(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-sand-1300 border border-sand-1100 rounded-lg px-4 py-2 text-sand-100"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-sand-600 mt-1">
                 Maximum SOL the delegate can send in a single transaction
               </p>
             </div>
@@ -183,9 +183,9 @@ function DelegationContent() {
                 min="1"
                 value={maxTokenPerTx}
                 onChange={(e) => setMaxTokenPerTx(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-sand-1300 border border-sand-1100 rounded-lg px-4 py-2 text-sand-100"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-sand-600 mt-1">
                 Maximum tokens the delegate can send in a single transaction
               </p>
             </div>
@@ -197,7 +197,7 @@ function DelegationContent() {
               <select
                 value={durationHours}
                 onChange={(e) => setDurationHours(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-sand-1300 border border-sand-1100 rounded-lg px-4 py-2 text-sand-100"
               >
                 <option value="1">1 hour</option>
                 <option value="6">6 hours</option>
@@ -206,7 +206,7 @@ function DelegationContent() {
                 <option value="48">48 hours</option>
                 <option value="168">1 week</option>
               </select>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-sand-600 mt-1">
                 Delegation will expire automatically after this time
               </p>
             </div>
@@ -216,9 +216,9 @@ function DelegationContent() {
 
       {/* Password Setup */}
       {connected && (
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
+        <div className="bg-sand-1400 rounded-lg border border-sand-1200 p-6">
           <h2 className="text-2xl font-semibold mb-4">3. Create Password</h2>
-          <p className="text-gray-400 mb-4">
+          <p className="text-sand-500 mb-4">
             This password will encrypt the delegate wallet on your computer
           </p>
           <div className="space-y-4">
@@ -228,7 +228,7 @@ function DelegationContent() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-sand-1300 border border-sand-1100 rounded-lg px-4 py-2 text-sand-100"
                 placeholder="Enter a secure password"
                 minLength={8}
               />
@@ -241,7 +241,7 @@ function DelegationContent() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-sand-1300 border border-sand-1100 rounded-lg px-4 py-2 text-sand-100"
                 placeholder="Confirm your password"
                 minLength={8}
               />
@@ -252,11 +252,11 @@ function DelegationContent() {
 
       {/* Create Delegation Button */}
       {connected && (
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
+        <div className="bg-sand-1400 rounded-lg border border-sand-1200 p-6">
           <button
             onClick={handleCreateDelegation}
             disabled={isCreating || !password || !confirmPassword}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-sand-1100 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors"
           >
             {isCreating ? "Creating Delegation..." : "Create Delegation"}
           </button>
@@ -274,14 +274,14 @@ function DelegationContent() {
           )}
 
           {delegatePublicKey && (
-            <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+            <div className="mt-4 p-4 bg-sand-1300 rounded-lg">
               <p className="text-sm font-semibold mb-2">Delegate Wallet Address:</p>
               <p className="font-mono text-xs text-orange-400 break-all">
                 {delegatePublicKey}
               </p>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-sand-600 mt-2">
                 Save this address for your records. You can view delegation status
-                in the terminal using <code className="bg-gray-900 px-1 py-0.5 rounded">/delegate</code>
+                in the terminal using <code className="bg-sand-1400 px-1 py-0.5 rounded">/delegate</code>
               </p>
             </div>
           )}

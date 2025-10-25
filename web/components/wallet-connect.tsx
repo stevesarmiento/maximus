@@ -66,15 +66,15 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
   return (
     <div className="border border-border-low rounded-lg p-8">
       <h2 className="text-title-4 mb-3">Connect Wallet</h2>
-      <p className="text-body-l text-gray-600 mb-6">
+      <p className="text-body-l text-sand-500 mb-6">
         Connect your Solana wallet to approve it for use with Maximus terminal
       </p>
 
       <div className="flex flex-col items-center space-y-4">
-        <WalletMultiButton className="!bg-black hover:!bg-gray-900 !rounded-lg !font-inter-medium !text-body-md" />
+        <WalletMultiButton className="!bg-sand-100 hover:!bg-sand-200 !text-sand-1500 !rounded-lg !font-inter-medium !text-body-md" />
 
         {isAdding && (
-          <div className="text-body-md text-gray-600 animate-pulse">
+          <div className="text-body-md text-sand-500 animate-pulse">
             Adding wallet to configuration...
           </div>
         )}
@@ -92,7 +92,7 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
         )}
 
         {connected && publicKey && (
-          <div className="text-body-md text-gray-600 font-berkeley-mono">
+          <div className="text-body-md text-sand-500 font-berkeley-mono">
             Connected: {publicKey.toBase58().slice(0, 8)}...
             {publicKey.toBase58().slice(-8)}
           </div>

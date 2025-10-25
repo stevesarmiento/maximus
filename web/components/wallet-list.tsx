@@ -42,15 +42,15 @@ export default function WalletList({
               className="flex items-center justify-between p-4 border border-border-extra-low hover:border-border-low rounded-lg transition-colors"
             >
               <div className="flex-1">
-                <div className="font-berkeley-mono text-body-md text-gray-900">
+                <div className="font-berkeley-mono text-body-md text-sand-100">
                   {wallet.address}
                 </div>
                 {wallet.label && (
-                  <div className="text-body-md text-gray-600 mt-1">
+                  <div className="text-body-md text-sand-400 mt-1">
                     {wallet.label}
                   </div>
                 )}
-                <div className="text-body-md text-gray-500 mt-1">
+                <div className="text-body-md text-sand-500 mt-1">
                   Added: {new Date(wallet.added_at).toLocaleString()}
                 </div>
               </div>

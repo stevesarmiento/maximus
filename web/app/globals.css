@@ -8,12 +8,12 @@
 .prose li code,
 .prose td code,
 .prose th code {
-  background-color: oklch(0.927 0.0122 96.43) !important; /* sand-200 */
-  color: oklch(0.279 0.0029 17.33) !important; /* sand-1500 */
+  background-color: oklch(0.3356 0.0046 39.42) !important; /* sand-1400 */
+  color: oklch(0.9665 0.0067 97.35) !important; /* sand-100 */
   padding: 0.125rem 0.375rem !important;
   border-radius: 0.375rem !important;
   font-size: 0.75rem !important; /* text-xs */
-  border: 1px solid oklch(0.839 0.0187 78.23) !important; /* sand-400 */
+  border: 1px solid oklch(0.5438 0.0206 39.32) !important; /* sand-1000 */
   font-family: var(--font-berkeley-mono), ui-monospace, monospace !important;
 }
 
@@ -37,14 +37,14 @@
 }
 
 @theme {
-  --color-cream: oklch(0.9553 0.0029 84.56);
-  --color-bg1: oklch(0.9826 0.0034 97.35);
+  --color-cream: oklch(0.3356 0.0046 39.42);
+  --color-bg1: oklch(0.2189 0.0016 17.28);
 
-  /* Border colors mapped to sand scale */
-  --color-border-strong: oklch(0.839 0.0187 78.23); /* sand/400 */
-  --color-border-medium: oklch(0.884 0.0163 82.79); /* sand/300 */
-  --color-border-low: oklch(0.927 0.0122 96.43); /* sand/200 */
-  --color-border-extra-low: oklch(0.9665 0.0067 97.35); /* sand/100 */
+  /* Border colors mapped to sand scale - inverted for dark theme */
+  --color-border-strong: oklch(0.5438 0.0206 39.32); /* sand/1000 */
+  --color-border-medium: oklch(0.4947 0.0156 41.09); /* sand/1100 */
+  --color-border-low: oklch(0.442 0.0111 34.3); /* sand/1200 */
+  --color-border-extra-low: oklch(0.3909 0.0076 43.22); /* sand/1300 */
 
     --color-sand-100: oklch(0.9665 0.0067 97.35);
     --color-sand-200: oklch(0.927 0.0122 96.43);
@@ -96,37 +96,37 @@
   --text-nav-item: 14px;
   
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: oklch(0.279 0.0029 17.33);
+  --foreground: oklch(0.9665 0.0067 97.35);
+  --card: oklch(0.3356 0.0046 39.42);
+  --card-foreground: oklch(0.9665 0.0067 97.35);
+  --popover: oklch(0.3356 0.0046 39.42);
+  --popover-foreground: oklch(0.9665 0.0067 97.35);
+  --primary: oklch(0.9665 0.0067 97.35);
+  --primary-foreground: oklch(0.279 0.0029 17.33);
+  --secondary: oklch(0.3909 0.0076 43.22);
+  --secondary-foreground: oklch(0.9665 0.0067 97.35);
+  --muted: oklch(0.3909 0.0076 43.22);
+  --muted-foreground: oklch(0.7454 0.0237 67.45);
+  --accent: oklch(0.3909 0.0076 43.22);
+  --accent-foreground: oklch(0.9665 0.0067 97.35);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.442 0.0111 34.3);
+  --input: oklch(0.442 0.0111 34.3);
+  --ring: oklch(0.5438 0.0206 39.32);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.3356 0.0046 39.42);
+  --sidebar-foreground: oklch(0.9665 0.0067 97.35);
+  --sidebar-primary: oklch(0.9665 0.0067 97.35);
+  --sidebar-primary-foreground: oklch(0.279 0.0029 17.33);
+  --sidebar-accent: oklch(0.3909 0.0076 43.22);
+  --sidebar-accent-foreground: oklch(0.9665 0.0067 97.35);
+  --sidebar-border: oklch(0.442 0.0111 34.3);
+  --sidebar-ring: oklch(0.5438 0.0206 39.32);
 }
 
 /* Responsive typography classes matching Figma specs */
@@ -238,7 +238,7 @@
 
 body {
   background-color: var(--color-bg1);
-  color: oklch(0.1725 0.0078 264.05);
+  color: oklch(0.9665 0.0067 97.35); /* sand-100 for text */
 }
 
 @theme inline {
@@ -329,8 +329,8 @@ body {
 .border-l-dashed-wide {
   background: repeating-linear-gradient(
     to bottom,
-    oklch(0.927 0.0122 96.43) 0px,
-    oklch(0.927 0.0122 96.43) 12px,
+    oklch(0.442 0.0111 34.3) 0px,
+    oklch(0.442 0.0111 34.3) 12px,
     transparent 12px,
     transparent 24px
   ) left/1px 100% no-repeat;
@@ -339,8 +339,8 @@ body {
 .border-r-dashed-wide {
   background: repeating-linear-gradient(
     to bottom,
-    oklch(0.927 0.0122 96.43) 0px,
-    oklch(0.927 0.0122 96.43) 12px,
+    oklch(0.442 0.0111 34.3) 0px,
+    oklch(0.442 0.0111 34.3) 12px,
     transparent 12px,
     transparent 24px
   ) right/1px 100% no-repeat;
@@ -350,15 +350,15 @@ body {
     background: 
       repeating-linear-gradient(
         to bottom,
-        oklch(0.927 0.0122 96.43) 0px,
-        oklch(0.927 0.0122 96.43) 12px,
+        oklch(0.442 0.0111 34.3) 0px,
+        oklch(0.442 0.0111 34.3) 12px,
         transparent 12px,
         transparent 24px
       ) left/1px 100% no-repeat,
       repeating-linear-gradient(
         to bottom,
-        oklch(0.927 0.0122 96.43) 0px,
-        oklch(0.927 0.0122 96.43) 12px,
+        oklch(0.442 0.0111 34.3) 0px,
+        oklch(0.442 0.0111 34.3) 12px,
         transparent 12px,
         transparent 24px
       ) right/1px 100% no-repeat;
@@ -368,15 +368,15 @@ body {
     background: 
       repeating-linear-gradient(
         to right,
-        oklch(0.927 0.0122 96.43) 0px,
-        oklch(0.927 0.0122 96.43) 12px,
+        oklch(0.442 0.0111 34.3) 0px,
+        oklch(0.442 0.0111 34.3) 12px,
         transparent 12px,
         transparent 24px
       ) top/100% 1px no-repeat,
       repeating-linear-gradient(
         to right,
-        oklch(0.927 0.0122 96.43) 0px,
-        oklch(0.927 0.0122 96.43) 12px,
+        oklch(0.442 0.0111 34.3) 0px,
+        oklch(0.442 0.0111 34.3) 12px,
         transparent 12px,
         transparent 24px
       ) bottom/100% 1px no-repeat;
@@ -386,8 +386,8 @@ body {
     background: 
       repeating-linear-gradient(
         to bottom,
-        oklch(0.927 0.0122 96.43) 0px,
-        oklch(0.927 0.0122 96.43) 12px,
+        oklch(0.442 0.0111 34.3) 0px,
+        oklch(0.442 0.0111 34.3) 12px,
         transparent 12px,
         transparent 24px
       ) center/1px 100% no-repeat;

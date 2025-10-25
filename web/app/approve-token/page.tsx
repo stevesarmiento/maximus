@@ -1,6 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Navigation } from "@/components/navigation";
+import { HeroSection } from "@/components/hero-section";
+import { ContentSection } from "@/components/content-section";
+import { InfoBox } from "@/components/info-box";
+import { FooterSection } from "@/components/footer-section";
 
 const TokenApproval = dynamic(() => import("@/components/token-approval"), {
   ssr: false,
@@ -8,51 +13,54 @@ const TokenApproval = dynamic(() => import("@/components/token-approval"), {
 
 export default function ApproveTokenPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900">
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
-              Approve Token Delegation
-            </h1>
-            <p className="text-gray-400 text-lg">
-              Allow your delegate wallet to spend tokens from your main wallet
-            </p>
-          </div>
+    <div className="min-h-screen bg-bg1 overflow-x-clip relative">
+      {/* Gradient from top to bottom */}
+      <div className="absolute top-0 left-0 right-0 h-[600px] bg-gradient-to-b from-sand-1400/30 to-transparent pointer-events-none z-0" />
+      
+      <Navigation />
+      
+      <div className="relative z-10">
+        <div className="max-w-7xl mx-auto border-r border-l border-border-low">
+          <HeroSection 
+            title="Approve Token Delegation"
+            description="Allow your delegate wallet to spend tokens from your main wallet"
+          />
 
-          <TokenApproval />
+          <ContentSection>
+            <TokenApproval />
 
-          <div className="mt-12 p-6 bg-gray-900 rounded-lg border border-gray-800">
-            <h2 className="text-xl font-semibold mb-4">What is Token Approval?</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>
-                Token approval allows your delegate wallet to spend SPL tokens directly
-                from your main wallet's token accounts. This enables autonomous swaps
-                and transfers without moving tokens to the delegate first.
-              </p>
-              <div className="mt-4 p-4 bg-blue-900/20 border border-blue-800 rounded-lg">
-                <h3 className="font-semibold text-blue-400 mb-2">How It Works</h3>
-                <ul className="text-sm space-y-2">
-                  <li>• Your tokens stay in your main wallet</li>
-                  <li>• Delegate can spend up to approved amount</li>
-                  <li>• You can revoke approval anytime</li>
-                  <li>• Approval is per-token (approve each token separately)</li>
-                </ul>
-              </div>
-              <div className="mt-4 p-4 bg-green-900/20 border border-green-800 rounded-lg">
-                <h3 className="font-semibold text-green-400 mb-2">Example Use Case</h3>
-                <p className="text-sm">
-                  1. Approve delegate to spend 1000 USDC<br />
-                  2. Terminal can now: "Swap 100 USDC for SOL"<br />
-                  3. Swap happens from YOUR wallet, not delegate's<br />
-                  4. No need to transfer USDC to delegate!
+            <InfoBox title="What is Token Approval?">
+              <div className="space-y-6 text-sand-500">
+                <p className="text-body-l">
+                  Token approval allows your delegate wallet to spend SPL tokens directly
+                  from your main wallet's token accounts. This enables autonomous swaps
+                  and transfers without moving tokens to the delegate first.
                 </p>
+                <div className="p-6 bg-sand-1300 border border-sand-1000">
+                  <h3 className="text-title-5 text-sand-100 mb-4 font-diatype-medium">How It Works</h3>
+                  <ul className="text-body-l text-sand-100 space-y-2">
+                    <li>• Your tokens stay in your main wallet</li>
+                    <li>• Delegate can spend up to approved amount</li>
+                    <li>• You can revoke approval anytime</li>
+                    <li>• Approval is per-token (approve each token separately)</li>
+                  </ul>
+                </div>
+                <div className="p-6 bg-sand-1300 border border-sand-1000">
+                  <h3 className="text-title-5 text-sand-100 mb-4 font-diatype-medium">Example Use Case</h3>
+                  <div className="text-body-l text-sand-100 space-y-2">
+                    <p>1. Approve delegate to spend 1000 USDC</p>
+                    <p>2. Terminal can now: "Swap 100 USDC for SOL"</p>
+                    <p>3. Swap happens from YOUR wallet, not delegate's</p>
+                    <p>4. No need to transfer USDC to delegate!</p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </InfoBox>
+          </ContentSection>
+
+          <FooterSection />
         </div>
       </div>
-    </main>
+    </div>
   );
 }
-
