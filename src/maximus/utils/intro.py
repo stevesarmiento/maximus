@@ -23,6 +23,7 @@ def check_api_status():
     """Check if API keys are configured."""
     openai_key = os.getenv("OPENAI_API_KEY")
     coingecko_key = os.getenv("COINGECKO_API_KEY")
+    titan_key = os.getenv("TITAN_API_TOKEN")
     
     statuses = []
     
@@ -37,6 +38,12 @@ def check_api_status():
         statuses.append(("CoinGecko API", " ✓", "\033[92m"))  # Green
     else:
         statuses.append(("CoinGecko API", " ✗", "\033[91m"))  # Red
+    
+    # Check Titan API token (for token swaps)
+    if titan_key and len(titan_key) > 0:
+        statuses.append(("Titan Swap API", " ✓", "\033[92m"))  # Green
+    else:
+        statuses.append(("Titan Swap API", " ✗ (swaps disabled)", "\033[93m"))  # Yellow
     
     return statuses
 

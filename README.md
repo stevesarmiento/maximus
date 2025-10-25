@@ -17,6 +17,7 @@ It's not just another chatbot. It's an agent that plans ahead, verifies its prog
 - **Self-Validation**: Checks its own work and iterates until tasks are complete
 - **Conversational Memory**: Remembers past queries within a session using Capi memory API
 - **Real-Time Asset Data**: Access to prices, market data, OHLC charts, and asset information from CoinGecko
+- **Solana Integration**: Connect wallets via web dashboard and query on-chain data directly from terminal
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/stevensarmi_?style=social)](https://twitter.com/stevensarmi_)
 
@@ -27,6 +28,8 @@ It's not just another chatbot. It's an agent that plans ahead, verifies its prog
 - OpenAI API key (get [here](https://platform.openai.com/api-keys))
 - CoinGecko Pro API key (get [here](https://www.coingecko.com/en/api/pricing))
 - Capi API key for memory (get [here](https://capi.dev/sign-up)) - Optional but recommended
+- Helius RPC API key for Solana features (get [here](https://helius.dev)) - Optional
+- Titan API token for token swaps (contact info@titandex.io) - Required for swap functionality
 
 ### Installation
 
@@ -50,6 +53,9 @@ cp .env.example .env
 # OPENAI_API_KEY=your-openai-api-key
 # COINGECKO_API_KEY=your-coingecko-api-key
 # CAPI_API_KEY=your-capi-api-key (optional, for conversational memory)
+# HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=your-api-key (optional, for Solana)
+# TITAN_API_TOKEN=your-titan-api-token (required for token swaps, contact info@titandex.io)
+# TITAN_WS_URL=wss://us1.api.demo.titan.exchange/api/v1/ws (optional, defaults to US endpoint)
 ```
 
 ### Usage
@@ -62,6 +68,8 @@ uv run maximus
 ### Example Queries
 
 Try asking Maximus questions like:
+
+**Market Data:**
 - "What is Bitcoin's current price and market cap?"
 - "Compare the 30-day price performance of Ethereum and Solana"
 - "What are the top 10 cryptocurrencies by market cap?"
@@ -69,9 +77,25 @@ Try asking Maximus questions like:
 - "What are the trending cryptocurrencies right now?"
 - "Get detailed information about Cardano"
 
+**Solana Wallets (requires web dashboard setup):**
+- `/balances` - Show wallet balances instantly
+- `/transactions` - Show recent transactions
+- "What tokens are in my wallet?"
+- "Show me my recent Solana transactions"
+- "What's my SOL balance?"
+
+**Solana Transactions (requires delegation setup):**
+- "Send 0.5 SOL to <address>" - Executes real SOL transfers
+- "Swap 10 USDC for SOL" - Executes real token swaps via Titan
+- "Transfer tokens to another wallet" - Executes token transfers
+- `/delegate` - View delegation status
+- `/revoke` - Revoke delegation
+
+⚠️ **Warning:** These execute real on-chain transactions with real money!
+
 Maximus will automatically:
 1. Break down your request into actionable tasks
-2. Fetch the necessary onchain data from CoinGecko
+2. Fetch the necessary onchain data
 3. Perform calculations and analysis
 4. Provide a comprehensive, data-rich response
 
@@ -95,7 +119,129 @@ Maximus has conversational memory powered by Capi, allowing it to remember and r
 - `/clear` - Delete all memories from the current session using Capi's forgetMemory API
 - `exit` or `quit` - Exit Maximus (memories are automatically deleted)
 
-**Note:** Memory is session-based. Each time you start Maximus, you get a fresh session with no memory from previous runs. When you exit or use `/clear-mem`, memories are permanently deleted from Capi's storage.
+**Note:** Memory is session-based. Each time you start Maximus, you get a fresh session with no memory from previous runs. When you exit or use `/clear`, memories are permanently deleted from Capi's storage.
+
+### Solana Wallet Integration
+
+Maximus can query your Solana wallets for balances, tokens, and transaction history:
+
+**Setup:**
+1. Start the web dashboard:
+   ```bash
+   cd web
+   npm install
+   npm run dev
+   ```
+
+2. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+3. Click "Connect Wallet" and approve the connection in your browser extension
+
+4. Your wallet is now approved! Return to the Maximus terminal
+
+**Terminal Commands:**
+- `/balances` - Show SOL and token balances for all approved wallets
+- `/transactions` - Show recent transaction history
+- Natural language: "What's in my wallet?", "Show my recent transactions"
+
+**How it works:**
+- Wallets are stored in `~/.maximus/wallets.json`
+- Only public keys are stored (never private keys)
+- Terminal queries on-chain data via Helius RPC
+- Web dashboard manages wallet approvals securely
+
+### Transaction Signing with Delegation
+
+Maximus can autonomously sign transactions within delegated limits:
+
+**Setup:**
+1. Visit [http://localhost:3000/delegate](http://localhost:3000/delegate)
+
+2. Connect your wallet and set limits:
+   - Max SOL per transaction (e.g., 1.0 SOL)
+   - Max tokens per transaction (e.g., 100)
+   - Duration (e.g., 24 hours)
+
+3. Create a password to encrypt the delegate wallet
+
+4. Delegation saved! Terminal can now sign transactions
+
+**Usage:**
+```bash
+# Check delegation
+>> /delegate
+
+# Send SOL
+>> Send 0.5 SOL to <address>
+
+# Swap tokens
+>> Swap 25 USDC for SOL
+
+# Revoke delegation
+>> /revoke
+```
+
+**Security:**
+- Delegate wallet encrypted with your password
+- Time-limited (expires automatically)
+- Spending limits enforced
+- Revocable at any time
+- See [DELEGATION_GUIDE.md](DELEGATION_GUIDE.md) for details
+
+### Token Swaps with Titan Router
+
+Maximus uses Titan's WebSocket-based swap API to provide live streaming quotes from multiple providers and executes real swaps on-chain:
+
+**Features:**
+- **Live Quote Streaming**: Real-time quotes from Jupiter aggregator, Pyth Express Relay, Hashflow, and other providers
+- **Interactive UI**: Live-updating table showing routes, prices, and rates from all providers
+- **Best Execution**: Automatically highlights the best quote by output amount
+- **User Confirmation**: Press Enter to execute the best quote, or Ctrl+C to cancel
+- **On-Chain Execution**: Signs and sends transactions to Solana network
+- **Transaction Confirmation**: Waits for confirmation and provides Solscan link
+
+**How it works:**
+1. Agent connects to Titan WebSocket API
+2. Streams live quotes continuously (updates every 500ms)
+3. Displays an in-place updating table showing:
+   - Provider name
+   - Route (e.g., "Raydium → Orca → Jupiter")
+   - Input/output amounts
+   - Exchange rate
+4. Best quote highlighted in green with ★ indicator
+5. User presses Enter to confirm and execute
+6. Transaction signed by delegate wallet
+7. Sent to Solana network and confirmed
+8. Transaction signature and Solscan link returned
+
+**Example:**
+```bash
+>> Swap 10 USDC for SOL
+
+╭─ Live Quotes
+│ Provider        Route                In USDC      Out SOL      Rate
+│ ───────────────────────────────────────────────────────────────────────
+│ ★ Jupiter       Raydium → Orca       10.0000      0.0987       0.0987
+│   Pyth Express  Direct               10.0000      0.0985       0.0985
+│   Hashflow      Direct               10.0000      0.0983       0.0983
+│
+╰───────────────────────────────────────────────────────────────────────
+
+Press Enter to execute best quote, or Ctrl+C to cancel
+
+# After pressing Enter:
+💫 Executing swap via Jupiter...
+📤 Sending transaction to Solana...
+⏳ Waiting for confirmation...
+✅ Swap executed successfully!
+   Transaction: 5K7Qp...abc123
+   View on Solscan: https://solscan.io/tx/5K7Qp...abc123
+```
+
+**Prerequisites:**
+- Delegate wallet must have the tokens you want to swap
+- Transfer tokens to delegate address (shown at startup), or
+- Use token delegation via `/approve-token` (experimental)
 
 ## Architecture
 
@@ -124,6 +270,14 @@ Maximus has access to the following onchain data and analysis tools:
 - `get_coin_info`: Detailed information about a cryptocurrency project
 - `search_cryptocurrency`: Search for cryptocurrencies by name or symbol
 
+**Solana Blockchain:**
+- `get_wallet_balances`: Get SOL and SPL token balances for approved wallets
+- `get_transaction_history`: Fetch recent transaction history
+- `get_token_accounts`: Get detailed token account information
+- `send_sol`: Send SOL using delegated wallet
+- `send_token`: Send SPL tokens using delegated wallet
+- `swap_tokens`: Swap tokens via Titan router with live streaming quotes
+
 ## Project Structure
 
 ```
@@ -142,14 +296,21 @@ maximus/
 │       │   ├── prices.py # Price and OHLC data tools
 │       │   ├── market.py # Market overview tools
 │       │   ├── memory.py # Capi memory integration
-│       │   └── info.py   # Asset information tools
+│       │   ├── info.py   # Asset information tools
+│       │   ├── solana.py # Solana blockchain tools
+│       │   └── solana_client.py # Helius RPC client wrapper
 │       └── utils/        # Utility functions
 │           ├── charts.py
 │           ├── command_palette.py
 │           ├── intro.py
 │           ├── logger.py
 │           ├── status_bar.py
-│           └── ui.py
+│           ├── ui.py
+│           └── wallet_storage.py # Wallet configuration management
+├── web/                 # Web dashboard for wallet management
+│   ├── app/             # Next.js app router
+│   ├── components/      # React components
+│   └── package.json
 ├── .env.example
 ├── pyproject.toml
 └── uv.lock

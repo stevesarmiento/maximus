@@ -39,6 +39,12 @@ class CommandPalette:
         
         # Define available commands
         self.commands = [
+            Command("/balances", ["bal", "wallet"], "Show Solana wallet balances"),
+            Command("/transactions", ["txs", "history"], "Show recent Solana transactions"),
+            Command("/delegate", ["deleg"], "Show delegation status"),
+            Command("/export-delegate", ["export"], "Export delegate wallet for backup"),
+            Command("/import-delegate", ["import"], "Import delegate wallet from backup"),
+            Command("/revoke", ["revoke-delegate"], "Revoke current delegation"),
             Command("/clear", ["reset"], "Clear conversation memory"),
             Command("/config", ["settings"], "Open configuration settings"),
             Command("/cost", ["usage", "billing"], "Show session cost and duration"),
