@@ -21,6 +21,8 @@ dependencies = [
     "solders>=0.22.0",
     "cryptography>=42.0.0",
     "base58>=2.1.1",
+    "msgpack>=1.0.8",
+    "websockets>=12.0",
 ]
 
 [project.scripts]
@@ -28,3 +30,8 @@ maximus = "maximus.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]

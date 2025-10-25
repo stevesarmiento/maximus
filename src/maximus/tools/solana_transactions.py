@@ -8,7 +8,8 @@ from solders.message import Message
 from solana.rpc.commitment import Confirmed
 from maximus.tools.solana_client import get_solana_client
 from maximus.utils.delegate_wallet import get_delegate_wallet
-import requests
+import asyncio
+import base64
 
 
 ####################################
@@ -263,10 +264,15 @@ def swap_tokens(
     slippage_bps: int = 50
 ) -> dict:
     """
-    Swap tokens using Jupiter aggregator with the delegated wallet.
+    Swap tokens using Titan router with live streaming quotes from multiple providers.
     
-    This tool gets the best swap rate from Jupiter and executes the swap
-    using the delegate wallet for signing.
+    This tool streams quotes from Jupiter aggregator, Pyth Express Relay, Hashflow,
+    and other providers in real-time, displaying a live table of rates. User confirms
+    by pressing Enter to execute the best quote.
+    
+    IMPORTANT: The delegate wallet must have tokens to swap. Either:
+    1. Transfer tokens to the delegate wallet first, or
+    2. Approve token delegation via the web dashboard (experimental)
     
     Use this when users ask to:
     - "Swap X USDC for SOL"
@@ -300,11 +306,13 @@ def swap_tokens(
                 "error": "No delegation found"
             }
         
-        # Validate Jupiter is in allowed programs
-        if "Jupiter" not in config.allowed_programs:
+        # Validate swap programs are allowed
+        # Accept Titan, Jupiter, or Raydium for backwards compatibility
+        allowed_swap_programs = ["Titan", "Jupiter", "Raydium"]
+        if not any(program in config.allowed_programs for program in allowed_swap_programs):
             return {
                 "success": False,
-                "error": "Jupiter swaps not allowed in delegation"
+                "error": f"Swap programs not allowed in delegation. Current allowed: {config.allowed_programs}"
             }
         
         # Validate amount against limits
@@ -314,140 +322,435 @@ def swap_tokens(
                 "error": f"Amount {amount} exceeds delegation limit of {config.max_token_per_tx} per transaction"
             }
         
-        # Get main wallet address (where the tokens actually are)
-        from maximus.utils.wallet_storage import get_wallet_storage
-        storage = get_wallet_storage()
-        wallets = storage.get_wallets()
+        # Use delegate wallet address for transaction building
+        # The delegate wallet will sign and execute the swap
+        delegate_address = str(keypair.pubkey())
         
-        if not wallets:
-            return {
-                "success": False,
-                "error": "No main wallet found. Connect wallet via web dashboard first."
-            }
-        
-        main_wallet_address = wallets[0].address
-        
-        # Get Jupiter quote using MAIN wallet as owner
-        # (delegate will sign, but tokens come from main wallet's accounts)
-        quote = get_jupiter_quote(from_token, to_token, amount)
-        if not quote:
-            return {
-                "success": False,
-                "error": "Failed to get Jupiter quote"
-            }
-        
-        # Build swap transaction
-        # Use main wallet address so Jupiter routes from correct token accounts
-        swap_tx = build_jupiter_swap(
-            quote=quote,
-            user_public_key=main_wallet_address,  # Main wallet's tokens!
-            slippage_bps=slippage_bps
+        # Stream quotes from Titan with live display
+        # Pass delegate address so Titan builds transaction for the delegate to sign
+        result = asyncio.run(
+            get_titan_swap_with_display(
+                from_token=from_token,
+                to_token=to_token,
+                amount=amount,
+                user_public_key=delegate_address,
+                slippage_bps=slippage_bps,
+            )
         )
         
-        if not swap_tx:
+        if not result:
             return {
                 "success": False,
-                "error": "Failed to build swap transaction"
+                "error": "Swap cancelled or no quotes available"
             }
         
+        provider_id, best_quote, all_quotes = result
+        
+        # Get output token info for proper decimal formatting
+        _, output_decimals, _ = resolve_token_info(to_token)
+        out_amount = best_quote.out_amount / (10 ** output_decimals)
+        
+        # Execute the swap transaction
+        print(f"\n💫 Executing swap via {provider_id}...")
+        
+        try:
+            # Get Solana client
+            client = get_solana_client()
+            
+            # Check if we have a pre-built transaction or need to build from instructions
+            if best_quote.transaction:
+                # Deserialize the transaction provided by Titan
+                from solders.transaction import VersionedTransaction
+                tx = VersionedTransaction.from_bytes(best_quote.transaction)
+                
+                # Sign with delegate wallet (transaction is already built with correct accounts)
+                tx.sign([keypair])
+                
+                # Send the transaction
+                print(f"📤 Sending transaction to Solana...")
+                from solana.rpc.types import TxOpts
+                opts = TxOpts(
+                    skip_preflight=False,
+                    preflight_commitment=Confirmed,
+                    max_retries=3
+                )
+                
+                signature = client.client.send_raw_transaction(
+                    bytes(tx),
+                    opts=opts
+                ).value
+                
+                print(f"⏳ Waiting for confirmation...")
+                # Wait for confirmation
+                confirmation = client.client.confirm_transaction(
+                    signature,
+                    commitment=Confirmed
+                )
+                
+                if confirmation.value:
+                    return {
+                        "success": True,
+                        "signature": str(signature),
+                        "provider": provider_id,
+                        "in_amount": amount,
+                        "out_amount": out_amount,
+                        "from_token": from_token,
+                        "to_token": to_token,
+                        "slippage_bps": best_quote.slippage_bps,
+                        "message": f"✅ Swap executed successfully!\n\n"
+                                  f"Swapped: {amount} {from_token} → {out_amount:.6f} {to_token}\n"
+                                  f"Provider: {provider_id}\n"
+                                  f"Transaction: {str(signature)}\n\n"
+                                  f"View on Solscan: https://solscan.io/tx/{str(signature)}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Transaction failed to confirm"
+                    }
+            
+            elif best_quote.instructions:
+                # Build transaction from instructions
+                print(f"🔧 Building transaction from {len(best_quote.instructions)} instructions...")
+                
+                from solders.instruction import Instruction as SoldersInstruction
+                from solders.message import MessageV0
+                from solders.transaction import VersionedTransaction
+                from solders.address_lookup_table_account import AddressLookupTableAccount
+                
+                # Convert Titan instructions to Solders instructions
+                instructions = []
+                for titan_ix in best_quote.instructions:
+                    # Titan format: {p: Pubkey, a: [AccountMeta], d: bytes}
+                    program_id = Pubkey(titan_ix['p'])
+                    accounts = []
+                    for acc in titan_ix['a']:
+                        from solders.instruction import AccountMeta
+                        accounts.append(AccountMeta(
+                            pubkey=Pubkey(acc['p']),
+                            is_signer=acc['s'],
+                            is_writable=acc['w']
+                        ))
+                    data = bytes(titan_ix['d'])
+                    instructions.append(SoldersInstruction(program_id, data, accounts))
+                
+                # Get recent blockhash
+                recent_blockhash_resp = client.client.get_latest_blockhash(Confirmed)
+                recent_blockhash = recent_blockhash_resp.value.blockhash
+                
+                # Load address lookup tables if any
+                lookup_accounts = []
+                if best_quote.address_lookup_tables:
+                    print(f"📋 Loading {len(best_quote.address_lookup_tables)} address lookup tables...")
+                    from solders.address_lookup_table_account import AddressLookupTableAccount
+                    
+                    for table_address in best_quote.address_lookup_tables:
+                        try:
+                            # Fetch lookup table account data
+                            table_pubkey = Pubkey(table_address)
+                            account_info = client.client.get_account_info(table_pubkey)
+                            
+                            if account_info.value and account_info.value.data:
+                                # Parse address lookup table from raw bytes
+                                # ALT format: discriminator (4) + deactivation_slot (8) + last_extended_slot (8) + last_extended_slot_start_index (1) + authority (33) + padding (7) + addresses (32 * n)
+                                data = bytes(account_info.value.data)
+                                
+                                # Skip header (61 bytes) and parse addresses
+                                HEADER_SIZE = 61
+                                if len(data) > HEADER_SIZE:
+                                    addresses_data = data[HEADER_SIZE:]
+                                    addresses = []
+                                    
+                                    # Each address is 32 bytes
+                                    for i in range(0, len(addresses_data), 32):
+                                        if i + 32 <= len(addresses_data):
+                                            addr_bytes = addresses_data[i:i+32]
+                                            addresses.append(Pubkey(addr_bytes))
+                                    
+                                    # Create lookup table account
+                                    alt = AddressLookupTableAccount(
+                                        key=table_pubkey,
+                                        addresses=addresses
+                                    )
+                                    lookup_accounts.append(alt)
+                                    print(f"  ✓ Loaded {len(addresses)} addresses from table")
+                                else:
+                                    print(f"  ⚠️  Lookup table data too short")
+                            else:
+                                print(f"  ⚠️  No data found for lookup table")
+                        except Exception as e:
+                            print(f"  ⚠️  Could not load lookup table: {e}")
+                
+                # Create message (V0 for address lookup table support)
+                message = MessageV0.try_compile(
+                    payer=keypair.pubkey(),
+                    instructions=instructions,
+                    address_lookup_table_accounts=lookup_accounts,
+                    recent_blockhash=recent_blockhash,
+                )
+                
+                # Create and sign transaction
+                tx = VersionedTransaction(message, [keypair])
+                
+                # Send the transaction
+                print(f"📤 Sending transaction to Solana...")
+                from solana.rpc.types import TxOpts
+                opts = TxOpts(
+                    skip_preflight=False,
+                    preflight_commitment=Confirmed,
+                    max_retries=3
+                )
+                
+                signature = client.client.send_raw_transaction(
+                    bytes(tx),
+                    opts=opts
+                ).value
+                
+                print(f"⏳ Waiting for confirmation...")
+                # Wait for confirmation
+                confirmation = client.client.confirm_transaction(
+                    signature,
+                    commitment=Confirmed
+                )
+                
+                if confirmation.value:
+                    return {
+                        "success": True,
+                        "signature": str(signature),
+                        "provider": provider_id,
+                        "in_amount": amount,
+                        "out_amount": out_amount,
+                        "from_token": from_token,
+                        "to_token": to_token,
+                        "slippage_bps": best_quote.slippage_bps,
+                        "message": f"✅ Swap executed successfully!\n\n"
+                                  f"Swapped: {amount} {from_token} → {out_amount:.6f} {to_token}\n"
+                                  f"Provider: {provider_id}\n"
+                                  f"Transaction: {str(signature)}\n\n"
+                                  f"View on Solscan: https://solscan.io/tx/{str(signature)}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Transaction failed to confirm"
+                    }
+            
+            else:
+                return {
+                    "success": False,
+                    "error": "Provider returned neither transaction nor instructions. Cannot execute swap."
+                }
+                
+        except Exception as tx_error:
+            error_msg = str(tx_error).lower()
+            
+            # Check for common errors
+            if "insufficient" in error_msg or "balance" in error_msg:
+                return {
+                    "success": False,
+                    "error": f"❌ Insufficient funds in delegate wallet.\n\n"
+                           f"The delegate wallet ({delegate_address}) doesn't have enough tokens to swap.\n\n"
+                           f"Solutions:\n"
+                           f"1. Send {amount} {from_token} to the delegate wallet\n"
+                           f"2. Or approve token delegation via http://localhost:3000/approve-token\n\n"
+                           f"Details: {tx_error}"
+                }
+            elif "simulation" in error_msg:
+                return {
+                    "success": False,
+                    "error": f"❌ Transaction simulation failed.\n\n"
+                           f"The swap transaction didn't pass simulation. This usually means:\n"
+                           f"- Delegate wallet doesn't have the tokens\n"
+                           f"- Token account doesn't exist\n"
+                           f"- Slippage tolerance too tight\n\n"
+                           f"Details: {tx_error}"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Transaction execution failed: {str(tx_error)}\n\n"
+                           f"Quote was valid but execution failed. Your funds are safe."
+                }
+    
+    except ValueError as e:
+        # Likely missing Titan API token
+        error_msg = str(e)
+        if "Titan API token" in error_msg:
+            return {
+                "success": False,
+                "error": "Titan API token not configured.\n\n"
+                       "To enable token swaps:\n"
+                       "1. Contact info@titandex.io to obtain a Titan API token\n"
+                       "2. Add TITAN_API_TOKEN=your-token to your .env file\n"
+                       "3. Restart Maximus\n\n"
+                       f"Details: {error_msg}"
+            }
         return {
             "success": False,
-            "error": "Jupiter swap ready! But requires token approval first.\n\n"
-                   f"Visit http://localhost:3000/approve-token to approve {from_token} delegation.\n"
-                   "Then the delegate can swap your tokens directly!"
+            "error": f"Configuration error: {error_msg}"
         }
-    
+    except ImportError as e:
+        return {
+            "success": False,
+            "error": f"Missing dependencies. Run 'uv sync' to install required packages.\n\nDetails: {str(e)}"
+        }
     except Exception as e:
         return {
             "success": False,
-            "error": f"Failed to swap tokens: {str(e)}"
+            "error": f"Failed to swap tokens: {str(e)}\n\n"
+                   "If this is a connection error, ensure:\n"
+                   "- TITAN_API_TOKEN is set in your .env file\n"
+                   "- You have run 'uv sync' to install dependencies\n"
+                   "- Your network connection is active"
         }
 
 
 ####################################
-# Jupiter Integration Helpers
+# Titan Integration Helpers
 ####################################
 
 
-def get_jupiter_quote(
-    input_mint: str,
-    output_mint: str,
-    amount: float
-) -> Optional[Dict[str, Any]]:
+# Symbol to mint address mapping (for convenience)
+# User can also provide mint address directly
+KNOWN_TOKEN_SYMBOLS = {
+    "SOL": "So11111111111111111111111111111111111111112",
+    "WSOL": "So11111111111111111111111111111111111111112",
+    "USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "USDT": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "BONK": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "JUP": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+}
+
+
+def get_token_decimals(mint_address: str) -> int:
     """
-    Get a swap quote from Jupiter API.
+    Query the Solana RPC to get token decimals from the mint account.
     
     Args:
-        input_mint: Input token mint address
-        output_mint: Output token mint address
-        amount: Amount to swap (in token units)
-        
+        mint_address: Token mint address (base58)
+    
     Returns:
-        Quote data or None if failed
+        Number of decimals (0-9)
     """
     try:
-        # Jupiter API endpoint
-        url = "https://quote-api.jup.ag/v6/quote"
+        client = get_solana_client()
         
-        # Convert amount to smallest units (assume 6 decimals for now)
-        amount_lamports = int(amount * 1e6)
+        # Special case for SOL/WSOL (native token, not an SPL token)
+        if mint_address == "So11111111111111111111111111111111111111112":
+            return 9
         
-        params = {
-            "inputMint": input_mint,
-            "outputMint": output_mint,
-            "amount": amount_lamports,
-            "slippageBps": 50,
-        }
+        # Get mint account info
+        mint_pubkey = Pubkey.from_string(mint_address)
+        account_info = client.client.get_account_info(mint_pubkey)
         
-        response = requests.get(url, params=params)
+        if not account_info.value:
+            print(f"⚠️  Could not find mint account {mint_address}, assuming 6 decimals")
+            return 6
         
-        if response.status_code == 200:
-            return response.json()
-        
-        return None
-    
+        # Parse mint data to extract decimals
+        # SPL Token Mint layout: decimals is at byte offset 44
+        data = account_info.value.data
+        if len(data) >= 45:
+            decimals = data[44]
+            return decimals
+        else:
+            print(f"⚠️  Invalid mint data for {mint_address}, assuming 6 decimals")
+            return 6
+            
     except Exception as e:
-        print(f"Error getting Jupiter quote: {e}")
-        return None
+        print(f"⚠️  Error fetching decimals for {mint_address}: {e}, assuming 6 decimals")
+        return 6
 
 
-def build_jupiter_swap(
-    quote: Dict[str, Any],
-    user_public_key: str,
-    slippage_bps: int = 50
-) -> Optional[str]:
+def resolve_token_info(token: str) -> tuple[str, int, str]:
     """
-    Build a Jupiter swap transaction.
+    Resolve token symbol or address to (mint_address, decimals, symbol).
+    
+    Queries the RPC to get actual decimals from the mint account.
     
     Args:
-        quote: Quote from get_jupiter_quote
+        token: Token symbol (e.g., "SOL", "USDC") or mint address
+    
+    Returns:
+        Tuple of (mint_address, decimals, symbol)
+    """
+    token_upper = token.upper()
+    
+    # Check if it's a known symbol
+    if token_upper in KNOWN_TOKEN_SYMBOLS:
+        mint_address = KNOWN_TOKEN_SYMBOLS[token_upper]
+        decimals = get_token_decimals(mint_address)
+        return (mint_address, decimals, token_upper)
+    
+    # Assume it's a mint address, query for decimals
+    mint_address = token
+    decimals = get_token_decimals(mint_address)
+    symbol = token_upper[:8]  # Use truncated address as symbol
+    
+    return (mint_address, decimals, symbol)
+
+
+async def get_titan_swap_with_display(
+    from_token: str,
+    to_token: str,
+    amount: float,
+    user_public_key: str,
+    slippage_bps: int = 50,
+) -> Optional[tuple]:
+    """
+    Get swap quotes from Titan with live-updating display.
+    
+    Args:
+        from_token: Input token symbol or mint address
+        to_token: Output token symbol or mint address
+        amount: Amount to swap (in token units)
         user_public_key: User's wallet address
         slippage_bps: Slippage tolerance in basis points
         
     Returns:
-        Serialized transaction or None if failed
+        Tuple of (provider_id, best_quote, all_quotes) or None
     """
-    try:
-        # Jupiter swap API endpoint
-        url = "https://quote-api.jup.ag/v6/swap"
-        
-        payload = {
-            "quoteResponse": quote,
-            "userPublicKey": user_public_key,
-            "wrapAndUnwrapSol": True,
-            "slippageBps": slippage_bps,
-        }
-        
-        response = requests.post(url, json=payload)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("swapTransaction")
-        
-        return None
+    from maximus.tools.titan_client import TitanClient
+    from maximus.tools.titan_display import (
+        stream_quotes_with_display,
+        QuoteDisplayConfig
+    )
     
-    except Exception as e:
-        print(f"Error building Jupiter swap: {e}")
-        return None
+    # Resolve token symbols to mint addresses and get decimals
+    input_mint, input_decimals, input_symbol = resolve_token_info(from_token)
+    output_mint, output_decimals, output_symbol = resolve_token_info(to_token)
+    
+    # Convert amount to smallest units using correct decimals
+    amount_units = int(amount * (10 ** input_decimals))
+    
+    # Create display config with correct decimals
+    config = QuoteDisplayConfig(
+        decimals_in=input_decimals,
+        decimals_out=output_decimals,
+        symbol_in=input_symbol,
+        symbol_out=output_symbol,
+    )
+    
+    # Create Titan client
+    client = TitanClient()
+    
+    try:
+        await client.connect()
+        
+        # Stream quotes with live display
+        result = await stream_quotes_with_display(
+            client=client,
+            input_mint=input_mint,
+            output_mint=output_mint,
+            amount=amount_units,
+            user_public_key=user_public_key,
+            slippage_bps=slippage_bps,
+            config=config,
+        )
+        
+        return result
+    
+    finally:
+        await client.close()
 
 

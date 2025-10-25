@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       delegatedBy,
       maxSolPerTx,
       maxTokenPerTx,
-      allowedPrograms: ["Jupiter", "Raydium"],
+      allowedPrograms: ["Titan"],
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString(),
       password, // This will be used by Python to encrypt

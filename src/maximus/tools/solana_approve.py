@@ -26,7 +26,7 @@ def approve_token_delegation(token_symbol: str, amount: float) -> dict:
     to spend up to the specified amount from your main wallet's token account.
     
     Once approved, the delegate can:
-    - Swap your tokens via Jupiter
+    - Swap your tokens via Titan router
     - Send tokens to other addresses
     - All without transferring tokens to the delegate first!
     

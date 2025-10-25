@@ -29,7 +29,7 @@ class DelegationConfig:
         self.delegated_by = delegated_by
         self.max_sol_per_tx = max_sol_per_tx
         self.max_token_per_tx = max_token_per_tx
-        self.allowed_programs = allowed_programs or ["Jupiter", "Raydium"]
+        self.allowed_programs = allowed_programs or ["Titan"]
         self.created_at = created_at or datetime.now(timezone.utc).isoformat()
         self.expires_at = expires_at
     
@@ -55,7 +55,7 @@ class DelegationConfig:
             delegated_by=data["delegatedBy"],
             max_sol_per_tx=data.get("maxSolPerTx", 1.0),
             max_token_per_tx=data.get("maxTokenPerTx", 100.0),
-            allowed_programs=data.get("allowedPrograms", ["Jupiter", "Raydium"]),
+            allowed_programs=data.get("allowedPrograms", ["Titan"]),
             created_at=data.get("createdAt"),
             expires_at=data.get("expiresAt"),
         )

@@ -29,6 +29,7 @@ It's not just another chatbot. It's an agent that plans ahead, verifies its prog
 - CoinGecko Pro API key (get [here](https://www.coingecko.com/en/api/pricing))
 - Capi API key for memory (get [here](https://capi.dev/sign-up)) - Optional but recommended
 - Helius RPC API key for Solana features (get [here](https://helius.dev)) - Optional
+- Titan API token for token swaps (contact info@titandex.io) - Required for swap functionality
 
 ### Installation
 
@@ -53,6 +54,8 @@ cp .env.example .env
 # COINGECKO_API_KEY=your-coingecko-api-key
 # CAPI_API_KEY=your-capi-api-key (optional, for conversational memory)
 # HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=your-api-key (optional, for Solana)
+# TITAN_API_TOKEN=your-titan-api-token (required for token swaps, contact info@titandex.io)
+# TITAN_WS_URL=wss://us1.api.demo.titan.exchange/api/v1/ws (optional, defaults to US endpoint)
 ```
 
 ### Usage
@@ -82,11 +85,13 @@ Try asking Maximus questions like:
 - "What's my SOL balance?"
 
 **Solana Transactions (requires delegation setup):**
-- "Send 0.5 SOL to <address>"
-- "Swap 10 USDC for SOL"
-- "Transfer tokens to another wallet"
+- "Send 0.5 SOL to <address>" - Executes real SOL transfers
+- "Swap 10 USDC for SOL" - Executes real token swaps via Titan
+- "Transfer tokens to another wallet" - Executes token transfers
 - `/delegate` - View delegation status
 - `/revoke` - Revoke delegation
+
+⚠️ **Warning:** These execute real on-chain transactions with real money!
 
 Maximus will automatically:
 1. Break down your request into actionable tasks
@@ -183,6 +188,61 @@ Maximus can autonomously sign transactions within delegated limits:
 - Revocable at any time
 - See [DELEGATION_GUIDE.md](DELEGATION_GUIDE.md) for details
 
+### Token Swaps with Titan Router
+
+Maximus uses Titan's WebSocket-based swap API to provide live streaming quotes from multiple providers and executes real swaps on-chain:
+
+**Features:**
+- **Live Quote Streaming**: Real-time quotes from Jupiter aggregator, Pyth Express Relay, Hashflow, and other providers
+- **Interactive UI**: Live-updating table showing routes, prices, and rates from all providers
+- **Best Execution**: Automatically highlights the best quote by output amount
+- **User Confirmation**: Press Enter to execute the best quote, or Ctrl+C to cancel
+- **On-Chain Execution**: Signs and sends transactions to Solana network
+- **Transaction Confirmation**: Waits for confirmation and provides Solscan link
+
+**How it works:**
+1. Agent connects to Titan WebSocket API
+2. Streams live quotes continuously (updates every 500ms)
+3. Displays an in-place updating table showing:
+   - Provider name
+   - Route (e.g., "Raydium → Orca → Jupiter")
+   - Input/output amounts
+   - Exchange rate
+4. Best quote highlighted in green with ★ indicator
+5. User presses Enter to confirm and execute
+6. Transaction signed by delegate wallet
+7. Sent to Solana network and confirmed
+8. Transaction signature and Solscan link returned
+
+**Example:**
+```bash
+>> Swap 10 USDC for SOL
+
+╭─ Live Quotes
+│ Provider        Route                In USDC      Out SOL      Rate
+│ ───────────────────────────────────────────────────────────────────────
+│ ★ Jupiter       Raydium → Orca       10.0000      0.0987       0.0987
+│   Pyth Express  Direct               10.0000      0.0985       0.0985
+│   Hashflow      Direct               10.0000      0.0983       0.0983
+│
+╰───────────────────────────────────────────────────────────────────────
+
+Press Enter to execute best quote, or Ctrl+C to cancel
+
+# After pressing Enter:
+💫 Executing swap via Jupiter...
+📤 Sending transaction to Solana...
+⏳ Waiting for confirmation...
+✅ Swap executed successfully!
+   Transaction: 5K7Qp...abc123
+   View on Solscan: https://solscan.io/tx/5K7Qp...abc123
+```
+
+**Prerequisites:**
+- Delegate wallet must have the tokens you want to swap
+- Transfer tokens to delegate address (shown at startup), or
+- Use token delegation via `/approve-token` (experimental)
+
 ## Architecture
 
 Maximus uses a multi-agent architecture with specialized components:
@@ -216,7 +276,7 @@ Maximus has access to the following onchain data and analysis tools:
 - `get_token_accounts`: Get detailed token account information
 - `send_sol`: Send SOL using delegated wallet
 - `send_token`: Send SPL tokens using delegated wallet
-- `swap_tokens`: Swap tokens via Jupiter aggregator
+- `swap_tokens`: Swap tokens via Titan router with live streaming quotes
 
 ## Project Structure
 
