@@ -66,7 +66,6 @@ def approve_token_delegation(token_symbol: str, amount: float) -> dict:
         token_accounts = client.get_token_accounts(main_wallet_address)
         
         # Find token account for the specified symbol
-        token_account = None
         token_mint = None
         decimals = 6
         
@@ -76,10 +75,7 @@ def approve_token_delegation(token_symbol: str, amount: float) -> dict:
                 metadata = client.get_token_metadata(mint)
                 if metadata.get('symbol', '').upper() == token_symbol.upper():
                     token_mint = mint
-                    decimals = account.get('decimals', 6)
-                    # We need the actual token account address, not just the mint
-                    # For now, store the account info
-                    token_account = account
+                    decimals = account.get('decimals') or metadata.get('decimals', 9)
                     break
         
         if not token_mint:
@@ -94,8 +90,9 @@ def approve_token_delegation(token_symbol: str, amount: float) -> dict:
         # Since we need the main wallet to sign this, we'll return instructions
         # for the user to approve via the web dashboard
         return {
-            "success": False,
+            "success": True,
             "requires_browser_approval": True,
+            "pending_approval": True,
             "message": f"To approve {token_symbol} delegation, please:\n\n"
                       f"1. Visit http://localhost:3000/approve-token\n"
                       f"2. Token: {token_symbol}\n"
@@ -106,6 +103,7 @@ def approve_token_delegation(token_symbol: str, amount: float) -> dict:
             "token_mint": token_mint,
             "delegate": delegate_address,
             "amount": amount,
+            "amount_raw": amount_raw,
             "decimals": decimals,
         }
     
@@ -128,6 +126,7 @@ def check_token_allowance(token_symbol: str) -> dict:
     """
     try:
         from maximus.tools.solana_delegation import check_delegation_status
+        from solana.rpc.types import TokenAccountOpts
         
         # Get main wallet
         storage = get_wallet_storage()
@@ -141,24 +140,80 @@ def check_token_allowance(token_symbol: str) -> dict:
         
         main_wallet_address = wallets[0].address
         
-        # Get token accounts
+        # Get token accounts with full info including pubkey
         client = get_solana_client()
-        token_accounts = client.get_token_accounts(main_wallet_address)
+        pubkey = Pubkey.from_string(main_wallet_address)
+        token_program_id = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+        opts = TokenAccountOpts(program_id=token_program_id)
+        response = client.client.get_token_accounts_by_owner_json_parsed(pubkey, opts)
         
-        # Find the token
-        for account in token_accounts:
-            mint = account.get('mint')
-            if mint:
-                metadata = client.get_token_metadata(mint)
-                if metadata.get('symbol', '').upper() == token_symbol.upper():
-                    # Check delegation status (simplified)
-                    return {
-                        "success": True,
-                        "token": token_symbol,
-                        "mint": mint,
-                        "balance": account.get('ui_amount', 0),
-                        "message": f"Token account found for {token_symbol}. Delegation check in progress..."
-                    }
+        if not response.value:
+            return {
+                "success": False,
+                "error": f"No token accounts found for wallet"
+            }
+        
+        # Find the token account for the specified symbol
+        for account_info in response.value:
+            account_data = account_info.account.data
+            
+            if isinstance(account_data, dict):
+                parsed = account_data.get('parsed', {})
+                info = parsed.get('info', {})
+                mint = info.get('mint')
+                
+                if mint:
+                    metadata = client.get_token_metadata(mint)
+                    if metadata.get('symbol', '').upper() == token_symbol.upper():
+                        # Get the token account address
+                        token_account_address = str(account_info.pubkey)
+                        
+                        # Get balance info
+                        token_amount = info.get('tokenAmount', {})
+                        balance = token_amount.get('uiAmount', 0)
+                        decimals = token_amount.get('decimals', 6)
+                        
+                        # Check actual delegation status
+                        try:
+                            delegation_info = check_delegation_status(token_account_address)
+                            
+                            if delegation_info and delegation_info.get('delegated'):
+                                # Active delegation found
+                                delegated_amount = delegation_info.get('amount', 0)
+                                delegate_address = delegation_info.get('delegate', '')
+                                
+                                return {
+                                    "success": True,
+                                    "token": token_symbol,
+                                    "mint": mint,
+                                    "balance": balance,
+                                    "decimals": decimals,
+                                    "is_approved": True,
+                                    "delegate_address": delegate_address,
+                                    "delegated_amount": delegated_amount,
+                                    "allowance": delegated_amount,
+                                    "message": f"{token_symbol} delegation active: {delegated_amount} tokens approved for {delegate_address[:8]}...{delegate_address[-8:]}"
+                                }
+                            else:
+                                # No delegation or zero allowance
+                                return {
+                                    "success": True,
+                                    "token": token_symbol,
+                                    "mint": mint,
+                                    "balance": balance,
+                                    "decimals": decimals,
+                                    "is_approved": False,
+                                    "delegate_address": None,
+                                    "delegated_amount": 0,
+                                    "allowance": 0,
+                                    "message": f"No active delegation found for {token_symbol}. Use approve_token_delegation to enable delegation."
+                                }
+                        
+                        except Exception as delegation_error:
+                            return {
+                                "success": False,
+                                "error": f"Failed to check delegation status for {token_symbol}: {str(delegation_error)}"
+                            }
         
         return {
             "success": False,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 import os from "os";
 
@@ -11,12 +11,22 @@ export async function GET() {
     const tempFile = path.join(configDir, "delegate_temp.json");
 
     // Check temp file first (not yet processed by terminal)
-    if (fs.existsSync(tempFile)) {
-      const data = JSON.parse(fs.readFileSync(tempFile, "utf-8"));
+    try {
+      const fileContent = await fs.readFile(tempFile, "utf-8");
+      const data = JSON.parse(fileContent);
+      
+      if (!data.publicKey) {
+        throw new Error("Invalid delegate data: missing publicKey");
+      }
+      
       return NextResponse.json({
         publicKey: data.publicKey,
         status: "pending",
       });
+    } catch (err: any) {
+      if (err.code !== "ENOENT") {
+        throw err; // Re-throw non-file-not-found errors
+      }
     }
 
     // If no temp file, would need to decrypt the encrypted file

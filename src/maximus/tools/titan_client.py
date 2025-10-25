@@ -7,6 +7,26 @@ streaming quotes from multiple DEX aggregators and RFQ providers.
 Protocol: v1.api.titan.ag
 Encoding: MessagePack
 Authentication: JWT Bearer token
+
+SSL/TLS Security:
+-----------------
+By default, this client uses secure SSL/TLS with certificate verification enabled.
+For local development environments where SSL certificate issues may occur, you can
+disable verification by setting the TITAN_WS_INSECURE environment variable:
+
+    TITAN_WS_INSECURE=true  # Only for local development
+
+WARNING: Disabling SSL verification is a security risk and should NEVER be used
+in production environments. The client will raise a RuntimeError if TITAN_WS_INSECURE
+is enabled while running in production (detected via ENV, NODE_ENV, or PYTHON_ENV
+environment variables set to "production" or "prod").
+
+Environment Variables:
+----------------------
+- TITAN_WS_URL: WebSocket URL (default: wss://us1.api.demo.titan.exchange/api/v1/ws)
+- TITAN_API_TOKEN: JWT Bearer token for authentication (required)
+- TITAN_WS_INSECURE: Set to "true" to disable SSL verification (development only)
+- ENV/NODE_ENV/PYTHON_ENV: Set to "production" or "prod" to indicate production environment
 """
 
 import os
@@ -14,6 +34,7 @@ import asyncio
 import msgpack
 import base58
 import ssl
+import logging
 from typing import Optional, Dict, Any, List, AsyncIterator
 from dataclasses import dataclass
 import websockets
@@ -24,6 +45,21 @@ from websockets.client import WebSocketClientProtocol
 # Demo endpoints: us1, jp1, de1 (Ohio, Tokyo, Frankfurt)
 TITAN_WS_URL = os.getenv("TITAN_WS_URL", "wss://us1.api.demo.titan.exchange/api/v1/ws")
 TITAN_API_TOKEN = os.getenv("TITAN_API_TOKEN")
+
+# SSL Security Configuration
+# WARNING: Only set TITAN_WS_INSECURE=true in local development environments
+# This disables SSL certificate verification which is a security risk
+TITAN_WS_INSECURE = os.getenv("TITAN_WS_INSECURE", "false").lower() == "true"
+
+# Environment detection
+ENV = os.getenv("ENV", "development").lower()
+NODE_ENV = os.getenv("NODE_ENV", "development").lower()
+PYTHON_ENV = os.getenv("PYTHON_ENV", "development").lower()
+
+# Check if running in production-like environment
+IS_PRODUCTION = ENV in ("production", "prod") or NODE_ENV == "production" or PYTHON_ENV == "production"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -75,10 +111,33 @@ class TitanClient:
             "Authorization": f"Bearer {self.api_token}",
         }
         
-        # Create SSL context that's more permissive for development
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
+        # Configure SSL/TLS verification
+        # By default, use secure SSL with certificate verification
+        if TITAN_WS_INSECURE:
+            # SECURITY WARNING: SSL certificate verification is disabled
+            if IS_PRODUCTION:
+                raise RuntimeError(
+                    "CRITICAL SECURITY ERROR: Cannot run with TITAN_WS_INSECURE=true in production environment. "
+                    f"Current environment: ENV={ENV}, NODE_ENV={NODE_ENV}, PYTHON_ENV={PYTHON_ENV}. "
+                    "SSL certificate verification must be enabled in production."
+                )
+            
+            logger.warning(
+                "=" * 80 + "\n"
+                "⚠️  SECURITY WARNING: SSL certificate verification is DISABLED\n"
+                "⚠️  TITAN_WS_INSECURE is set to true\n"
+                "⚠️  This should ONLY be used in local development environments\n"
+                "⚠️  DO NOT use this setting in production or with sensitive data\n"
+                + "=" * 80
+            )
+            
+            # Create insecure SSL context (development only)
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+        else:
+            # Use secure SSL context with default certificate verification
+            ssl_context = ssl.create_default_context()
         
         try:
             self.ws = await websockets.connect(
@@ -312,21 +371,35 @@ async def get_best_quote_from_stream(
         best_quote = None
         latest_quotes = None
         
-        async for quotes in client.request_swap_quotes(
-            input_mint=input_mint,
-            output_mint=output_mint,
-            amount=amount,
-            user_public_key=user_public_key,
-            slippage_bps=slippage_bps,
-        ):
-            latest_quotes = quotes
-            
-            # Find best quote (highest out_amount for ExactIn)
-            for provider_id, quote in quotes.quotes.items():
-                if best_quote is None or quote.out_amount > best_quote.out_amount:
-                    best_provider = provider_id
-                    best_quote = quote
+        async def stream_quotes():
+            nonlocal best_provider, best_quote, latest_quotes
+            async for quotes in client.request_swap_quotes(
+                input_mint=input_mint,
+                output_mint=output_mint,
+                amount=amount,
+                user_public_key=user_public_key,
+                slippage_bps=slippage_bps,
+            ):
+                latest_quotes = quotes
+                
+                # Find best quote based on swap mode
+                for provider_id, quote in quotes.quotes.items():
+                    if quotes.swap_mode == "ExactIn":
+                        # For ExactIn: select highest out_amount
+                        if best_quote is None or quote.out_amount > best_quote.out_amount:
+                            best_provider = provider_id
+                            best_quote = quote
+                    else:  # ExactOut
+                        # For ExactOut: select lowest in_amount
+                        if best_quote is None or quote.in_amount < best_quote.in_amount:
+                            best_provider = provider_id
+                            best_quote = quote
         
+        await asyncio.wait_for(stream_quotes(), timeout=timeout_seconds)
+        return (best_provider, best_quote, latest_quotes) if best_quote else None
+    
+    except asyncio.TimeoutError:
+        # Return best quote found so far, if any
         return (best_provider, best_quote, latest_quotes) if best_quote else None
     
     finally:

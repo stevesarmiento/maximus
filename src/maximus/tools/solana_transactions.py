@@ -241,13 +241,111 @@ def send_token(token_mint: str, to_address: str, amount: float) -> dict:
                 "error": f"No token account found for mint {token_mint}"
             }
         
-        # TODO: Get destination token account (associated token account)
-        # This is simplified - in production you'd use get_associated_token_address
+        # Get destination associated token account (ATA)
+        from spl.token.instructions import (
+            get_associated_token_address,
+            create_associated_token_account,
+            transfer_checked,
+            TransferCheckedParams
+        )
+        from solders.instruction import Instruction as SoldersInstruction
         
-        return {
-            "success": False,
-            "error": "Token transfer not fully implemented yet. Use send_sol for now."
-        }
+        # Parse addresses
+        mint_pubkey = Pubkey.from_string(token_mint)
+        destination_pubkey = Pubkey.from_string(to_address)
+        source_ata = Pubkey.from_string(source_account['address'])
+        
+        # Get destination ATA address
+        destination_ata = get_associated_token_address(
+            owner=destination_pubkey,
+            mint=mint_pubkey
+        )
+        
+        # Check if destination ATA exists
+        destination_account_info = client.client.get_account_info(destination_ata)
+        
+        # Build transaction instructions
+        instructions = []
+        
+        # If destination ATA doesn't exist, create it
+        if not destination_account_info.value:
+            print(f"ℹ️  Creating associated token account for recipient...")
+            create_ata_ix = create_associated_token_account(
+                payer=keypair.pubkey(),
+                owner=destination_pubkey,
+                mint=mint_pubkey
+            )
+            instructions.append(create_ata_ix)
+        
+        # Convert amount to integer units using token decimals
+        amount_units = int(amount * (10 ** decimals))
+        
+        # Create transfer_checked instruction (safer than transfer as it validates decimals)
+        transfer_ix = transfer_checked(
+            TransferCheckedParams(
+                program_id=Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+                source=source_ata,
+                mint=mint_pubkey,
+                dest=destination_ata,
+                owner=keypair.pubkey(),
+                amount=amount_units,
+                decimals=decimals,
+            )
+        )
+        instructions.append(transfer_ix)
+        
+        # Get recent blockhash
+        recent_blockhash_resp = client.client.get_latest_blockhash(Confirmed)
+        recent_blockhash = recent_blockhash_resp.value.blockhash
+        
+        # Create message and transaction
+        message = Message.new_with_blockhash(
+            instructions,
+            keypair.pubkey(),
+            recent_blockhash
+        )
+        
+        # Sign transaction with delegate wallet
+        tx = SoldersTransaction([keypair], message, recent_blockhash)
+        
+        # Send transaction
+        from solana.rpc.types import TxOpts
+        opts = TxOpts(
+            skip_preflight=False,
+            preflight_commitment=Confirmed,
+            max_retries=3
+        )
+        
+        print(f"📤 Sending token transfer transaction...")
+        signature = client.client.send_raw_transaction(
+            bytes(tx),
+            opts=opts
+        ).value
+        
+        # Wait for confirmation
+        print(f"⏳ Waiting for confirmation...")
+        confirmation = client.client.confirm_transaction(
+            signature,
+            commitment=Confirmed
+        )
+        
+        if confirmation.value:
+            return {
+                "success": True,
+                "signature": str(signature),
+                "amount": amount,
+                "to": to_address,
+                "from": str(keypair.pubkey()),
+                "token_mint": token_mint,
+                "message": f"✅ Successfully sent {amount} tokens to {to_address}\n"
+                          f"Transaction: {str(signature)}\n"
+                          f"View on Solscan: https://solscan.io/tx/{str(signature)}"
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Transaction failed to confirm"
+            }
     
     except Exception as e:
         return {
@@ -451,23 +549,31 @@ def swap_tokens(
                             account_info = client.client.get_account_info(table_pubkey)
                             
                             if account_info.value and account_info.value.data:
-                                # Parse address lookup table from raw bytes
-                                # ALT format: discriminator (4) + deactivation_slot (8) + last_extended_slot (8) + last_extended_slot_start_index (1) + authority (33) + padding (7) + addresses (32 * n)
+                                # Parse address lookup table using solders library structures
+                                # The account data contains the serialized AddressLookupTable state
                                 data = bytes(account_info.value.data)
                                 
-                                # Skip header (61 bytes) and parse addresses
-                                HEADER_SIZE = 61
-                                if len(data) > HEADER_SIZE:
-                                    addresses_data = data[HEADER_SIZE:]
-                                    addresses = []
-                                    
-                                    # Each address is 32 bytes
-                                    for i in range(0, len(addresses_data), 32):
-                                        if i + 32 <= len(addresses_data):
-                                            addr_bytes = addresses_data[i:i+32]
-                                            addresses.append(Pubkey(addr_bytes))
-                                    
-                                    # Create lookup table account
+                                # Parse addresses from ALT account data
+                                # ALT account structure (as defined in Solana's address-lookup-table program):
+                                # - discriminator: 4 bytes
+                                # - deactivation_slot: 8 bytes
+                                # - last_extended_slot: 8 bytes
+                                # - last_extended_slot_start_index: 1 byte
+                                # - authority: 32 bytes (Option<Pubkey>, 1 byte tag + 32 bytes if Some)
+                                # - padding: variable
+                                # - addresses: array of 32-byte Pubkeys
+                                
+                                # Addresses typically start at byte 56 after the metadata
+                                addresses = []
+                                offset = 56
+                                
+                                while offset + 32 <= len(data):
+                                    addr_bytes = data[offset:offset + 32]
+                                    addresses.append(Pubkey(addr_bytes))
+                                    offset += 32
+                                
+                                if addresses:
+                                    # Create AddressLookupTableAccount using solders
                                     alt = AddressLookupTableAccount(
                                         key=table_pubkey,
                                         addresses=addresses
@@ -475,7 +581,7 @@ def swap_tokens(
                                     lookup_accounts.append(alt)
                                     print(f"  ✓ Loaded {len(addresses)} addresses from table")
                                 else:
-                                    print(f"  ⚠️  Lookup table data too short")
+                                    print(f"  ⚠️  No addresses found in lookup table")
                             else:
                                 print(f"  ⚠️  No data found for lookup table")
                         except Exception as e:

@@ -171,10 +171,11 @@ def get_token_account_for_mint(
         token_accounts = client.get_token_accounts(wallet)
         
         for account in token_accounts:
-            if account.get('mint') == mint:
-                # Need to get the actual token account address
-                # This is simplified - in production you'd query the actual account address
-                return account.get('mint')  # Placeholder
+            # Check if the mint matches the target mint from the parsed account data
+            account_mint = account.get('account', {}).get('data', {}).get('parsed', {}).get('info', {}).get('mint')
+            if account_mint == mint:
+                # Return the token account pubkey (top-level 'pubkey' field)
+                return account.get('pubkey')
         
         return None
     

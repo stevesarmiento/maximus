@@ -4,12 +4,16 @@ from solana.rpc.api import Client
 from solders.pubkey import Pubkey
 from solders.signature import Signature
 import requests
-from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class SolanaClient:
     """Wrapper for Solana RPC client with Helius integration."""
+    
+    # Class-level cache for token metadata
+    # Using class-level instead of @lru_cache on instance methods prevents memory leaks
+    _metadata_cache: Dict[str, Dict[str, Any]] = {}
+    _cache_max_size = 1000
     
     def __init__(self, rpc_url: Optional[str] = None):
         """
@@ -102,10 +106,9 @@ class SolanaClient:
         except Exception as e:
             raise Exception(f"Failed to get token accounts for {address}: {str(e)}")
     
-    @lru_cache(maxsize=1000)
     def get_token_metadata(self, mint_address: str) -> Dict[str, Any]:
         """
-        Get token metadata from Helius DAS API with LRU caching.
+        Get token metadata from Helius DAS API with class-level caching.
         
         Args:
             mint_address: Token mint address
@@ -113,6 +116,11 @@ class SolanaClient:
         Returns:
             Token metadata including symbol, name, decimals
         """
+        # Check cache first
+        if mint_address in self._metadata_cache:
+            return self._metadata_cache[mint_address]
+        
+        # Fetch and cache
         return self._fetch_token_metadata(mint_address)
     
     def _fetch_token_metadata(self, mint_address: str) -> Dict[str, Any]:
@@ -125,6 +133,8 @@ class SolanaClient:
         Returns:
             Token metadata including symbol, name, decimals
         """
+        result = None
+        
         try:
             # Use Helius DAS API for token metadata
             response = requests.post(
@@ -142,34 +152,42 @@ class SolanaClient:
             
             if response.status_code == 200:
                 data = response.json()
-                result = data.get('result', {})
+                api_result = data.get('result', {})
                 
                 # Try to extract metadata
-                content = result.get('content', {})
+                content = api_result.get('content', {})
                 metadata = content.get('metadata', {})
                 
-                return {
+                result = {
                     'symbol': metadata.get('symbol', 'UNKNOWN'),
                     'name': metadata.get('name', 'Unknown Token'),
-                    'decimals': result.get('token_info', {}).get('decimals', 0),
+                    'decimals': api_result.get('token_info', {}).get('decimals', 0),
                     'mint': mint_address,
                 }
-            
-            # Fallback: return basic info
-            return {
-                'symbol': 'UNKNOWN',
-                'name': 'Unknown Token',
-                'decimals': 0,
-                'mint': mint_address,
-            }
+            else:
+                # Fallback: return basic info
+                result = {
+                    'symbol': 'UNKNOWN',
+                    'name': 'Unknown Token',
+                    'decimals': 0,
+                    'mint': mint_address,
+                }
         except Exception:
             # Return fallback metadata if API call fails
-            return {
+            result = {
                 'symbol': 'UNKNOWN',
                 'name': 'Unknown Token',
                 'decimals': 0,
                 'mint': mint_address,
             }
+        
+        # Cache the result with size limit and FIFO eviction
+        if len(self._metadata_cache) >= self._cache_max_size:
+            # Simple FIFO eviction - remove oldest entry
+            self._metadata_cache.pop(next(iter(self._metadata_cache)))
+        self._metadata_cache[mint_address] = result
+        
+        return result
     
     def get_token_metadata_batch(self, mint_addresses: List[str], max_workers: int = 10) -> Dict[str, Dict[str, Any]]:
         """
@@ -189,7 +207,7 @@ class SolanaClient:
         
         # Use ThreadPoolExecutor for parallel fetching
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks - get_token_metadata uses LRU cache
+            # Submit all tasks - get_token_metadata uses class-level cache
             future_to_mint = {
                 executor.submit(self.get_token_metadata, mint): mint 
                 for mint in mint_addresses

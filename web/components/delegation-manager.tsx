@@ -11,12 +11,12 @@ import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import { Keypair, clusterApiUrl } from "@solana/web3.js";
+import { clusterApiUrl } from "@solana/web3.js";
 import { useMemo } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 function DelegationContent() {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, signMessage } = useWallet();
   const [maxSolPerTx, setMaxSolPerTx] = useState("1.0");
   const [maxTokenPerTx, setMaxTokenPerTx] = useState("100");
   const [durationHours, setDurationHours] = useState("24");
@@ -34,6 +34,14 @@ function DelegationContent() {
       setMessage({
         type: "error",
         text: "Please connect your wallet first",
+      });
+      return;
+    }
+
+    if (!signMessage) {
+      setMessage({
+        type: "error",
+        text: "Your wallet does not support message signing",
       });
       return;
     }
@@ -58,30 +66,51 @@ function DelegationContent() {
     setMessage(null);
 
     try {
-      // Generate new delegate keypair
-      const delegateKeypair = Keypair.generate();
-      const delegatePubkey = delegateKeypair.publicKey.toBase58();
-      setDelegatePublicKey(delegatePubkey);
+      // Create message to sign for authentication
+      // Note: The delegate keypair will be generated securely on the server
+      const timestamp = Date.now();
+      const messageToSign = `Maximus Delegation Request\n\nTimestamp: ${timestamp}\nDelegated By: ${publicKey.toBase58()}\nMax SOL: ${maxSolPerTx}\nMax Tokens: ${maxTokenPerTx}\nDuration: ${durationHours} hours\n\nBy signing this message, you authorize the creation of a delegation with the above parameters.`;
+      
+      // Sign the message with the connected wallet
+      const messageBytes = new TextEncoder().encode(messageToSign);
+      let signature: Uint8Array;
+      try {
+        signature = await signMessage(messageBytes);
+      } catch (signError) {
+        setMessage({
+          type: "error",
+          text: "Failed to sign message. Please try again.",
+        });
+        setIsCreating(false);
+        return;
+      }
 
-      // Send delegation data to API
+      // Convert signature to base64 for transmission
+      const signatureBase64 = Buffer.from(signature).toString("base64");
+
+      // Send delegation data to API (server will generate the delegate keypair)
       const response = await fetch("/api/delegate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          delegatePublicKey: delegatePubkey,
-          delegateSecretKey: Array.from(delegateKeypair.secretKey),
           delegatedBy: publicKey.toBase58(),
           maxSolPerTx: parseFloat(maxSolPerTx),
           maxTokenPerTx: parseFloat(maxTokenPerTx),
           durationHours: parseInt(durationHours),
           password,
+          signature: signatureBase64,
+          message: messageToSign,
+          timestamp,
         }),
       });
 
       if (response.ok) {
+        const result = await response.json();
+        setDelegatePublicKey(result.delegatePublicKey || "");
+        
         setMessage({
           type: "success",
-          text: `Delegation created! Now open the Maximus terminal to activate it. The delegation will be encrypted automatically when you start maximus.`,
+          text: `Delegation created securely! The delegate keypair was generated and encrypted on the server. Now open the Maximus terminal to activate it.`,
         });
         
         // Clear password fields
