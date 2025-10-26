@@ -38,7 +38,9 @@
         "proper-lockfile": "^4.1.2",
         "react": "19.1.0",
         "react-dom": "19.1.0",
+        "symbols-react": "^1.2.7",
         "tailwind-merge": "^3.3.1",
+        "tweetnacl": "^1.0.3",
       },
       "devDependencies": {
         "@eslint/eslintrc": "^3",
@@ -2190,6 +2192,8 @@
     "supports-color": ["supports-color@7.2.0", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw=="],
 
     "supports-preserve-symlinks-flag": ["supports-preserve-symlinks-flag@1.0.0", "", {}, "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="],
+
+    "symbols-react": ["symbols-react@1.2.7", "", { "peerDependencies": { "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-sP/kqCHrOPaHmU4iajUQjDp7dfiOyNgEcoj5Gqt7YjBILzMUTW4jWILgdjoKv/i09B0QC8ffHRYXL3mBDhfAqQ=="],
 
     "tailwind-merge": ["tailwind-merge@3.3.1", "", {}, "sha512-gBXpgUm/3rp1lMZZrM/w7D8GKqshif0zAymAhbCyIt8KMe+0v9DQ7cdYLR4FHH/cKpdTXb+A/tKKU3eolfsI+g=="],
 

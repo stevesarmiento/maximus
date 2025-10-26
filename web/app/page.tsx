@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { Navigation } from "@/components/navigation";
 import { HeroSection } from "@/components/hero-section";
 import { ContentSection } from "@/components/content-section";
+import { BrowserTerminal } from "@/components/browser-terminal";
+import { FeaturesBento } from "@/components/features-bento";
 import { HowItWorks } from "@/components/how-it-works";
 import { FooterSection } from "@/components/footer-section";
 
@@ -44,14 +46,20 @@ export default function Home() {
       <div className="relative z-10">
         <div className="max-w-5xl mx-auto border-r border-l border-sand-1400">
           <HeroSection 
-            title="The autonomous agent for analysis and execution."
-            description="Maximus is an intelligent Solana agent that lives in your terminal. Let AI handle your trades with natural language commands and custom strategies."
+            title="The autonomous Solana agent for analysis & execution."
+            description="Maximus is an intelligent Solana agent that lives in your terminal. It can help you execute faster, understands your portfolio, and more."
           />
 
           <ContentSection>
+            <BrowserTerminal />
+          </ContentSection>
+
+          <FeaturesBento />
+
+          <div className="px-4 py-16">
             <WalletManager />
             <HowItWorks steps={steps} />
-          </ContentSection>
+          </div>
 
           <FooterSection />
         </div>

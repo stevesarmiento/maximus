@@ -17,12 +17,10 @@ export function ContentSection({ children }: ContentSectionProps) {
           src="https://uksgfm3uq5.ufs.sh/f/cflVQmqOSasDQKRSu6Uj5dYon0IGBlOwMNzyrah2b8fkucJT"
           alt="Background pattern"
           fill
-          className="object-cover opacity-30"
+          className="object-cover"
           quality={90}
           priority={false}
         />
-        {/* Gradient overlay to blend with the dark background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-bg1/80 via-bg1/60 to-bg1/80" />
       </div>
       
       <div className="max-w-4xl mx-auto relative z-10">

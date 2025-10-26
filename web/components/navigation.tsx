@@ -50,18 +50,11 @@ const Navigation = React.memo(() => {
     <>
       <nav className="sticky top-0 z-[200]">
         <div className="max-w-5xl mx-auto border-r border-l border-b border-sand-1400 bg-bg1 backdrop-blur-md">
-          <div className="px-4 sm:px-6 lg:px-12 py-4">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-4 z-10">
               <Logo className="text-sand-100" width={50} height={50} />
-              <div className="flex flex-col gap-0 mt-[5px]">
-                <div className="flex items-center gap-1">
-                    <span className="text-lg font-diatype-bold text-sand-100 mt-[-4px]">Maximus</span>  
-                    <span className="text-md font-diatype-mono text-sand-400 mt-[-4px]">v0.1.0</span>
-                </div>
-                <span className="text-md font-diatype-mono text-sand-1000 mt-[-4px]">Autonomous agent for onchain asset analysis and transaction execution</span>
-              </div>
             </Link>
             
             {/* Navigation Menu */}
