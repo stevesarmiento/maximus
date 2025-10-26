@@ -6,6 +6,8 @@ from maximus.tools.info import get_coin_info, search_cryptocurrency
 from maximus.tools.solana import get_wallet_balances, get_transaction_history, get_token_accounts
 from maximus.tools.solana_transactions import send_sol, send_token, swap_tokens
 from maximus.tools.solana_approve import approve_token_delegation, check_token_allowance
+from maximus.tools.technical_indicators import analyze_signals
+from maximus.tools.strategy_engine import execute_strategy
 
 TOOLS: list[Callable[..., Any]] = [
     get_price_snapshot,
@@ -25,4 +27,6 @@ TOOLS: list[Callable[..., Any]] = [
     swap_tokens,
     approve_token_delegation,
     check_token_allowance,
+    analyze_signals,
+    execute_strategy,
 ]

@@ -39,12 +39,23 @@ git clone https://github.com/stevesarmiento/maximus.git
 cd maximus
 ```
 
-2. Install dependencies with uv:
+2. Install TA-Lib system dependencies (required for technical indicators):
+```bash
+# macOS
+brew install ta-lib
+
+# Ubuntu/Debian
+sudo apt-get install ta-lib
+
+# Or install from source: https://github.com/TA-Lib/ta-lib-python
+```
+
+3. Install Python dependencies with uv:
 ```bash
 uv sync
 ```
 
-3. Set up your environment variables:
+4. Set up your environment variables:
 ```bash
 # Copy the example environment file
 cp .env.example .env
@@ -76,6 +87,20 @@ Try asking Maximus questions like:
 - "Show me the 7-day OHLC data for BTC"
 - "What are the trending cryptocurrencies right now?"
 - "Get detailed information about Cardano"
+
+**Technical Analysis:**
+- "Analyze Bitcoin using technical signals"
+- "What do the signals show for SOL over 30 days?"
+- "Show me the trading signals for ETH"
+- "Is BTC overbought or oversold?"
+- "What are the WaveTrend and RSI levels for Ethereum?"
+
+**Autonomous Trading (requires delegation setup):**
+- "Execute strategy for Solana in dry run mode" - Simulates trade with calculated position size
+- "Should I buy ETH based on signals?" - Gets strategy recommendation
+- "Analyze SOL with strategy engine" - Complete analysis with entry signals and position sizing
+- ⚠️ **Always test with dry_run=True first before live trading!**
+- 📖 See [AUTONOMOUS_TRADING_GUIDE.md](AUTONOMOUS_TRADING_GUIDE.md) for complete documentation
 
 **Solana Wallets (requires web dashboard setup):**
 - `/balances` - Show wallet balances instantly
@@ -270,6 +295,10 @@ Maximus has access to the following onchain data and analysis tools:
 - `get_coin_info`: Detailed information about a cryptocurrency project
 - `search_cryptocurrency`: Search for cryptocurrencies by name or symbol
 
+**Technical Analysis:**
+- `analyze_signals`: Complete technical analysis including WaveTrend Channel, Money Flow, RSI, Stochastic RSI, divergence detection, and aggregated trading signals
+- `execute_strategy`: Autonomous strategy execution that analyzes Maximus signals and automatically calculates position sizes, risk levels, and executes trades based on predefined strategy parameters
+
 **Solana Blockchain:**
 - `get_wallet_balances`: Get SOL and SPL token balances for approved wallets
 - `get_transaction_history`: Fetch recent transaction history
@@ -297,6 +326,7 @@ maximus/
 │       │   ├── market.py # Market overview tools
 │       │   ├── memory.py # Capi memory integration
 │       │   ├── info.py   # Asset information tools
+│       │   ├── technical_indicators.py # Maximus technical signals
 │       │   ├── solana.py # Solana blockchain tools
 │       │   └── solana_client.py # Helius RPC client wrapper
 │       └── utils/        # Utility functions
