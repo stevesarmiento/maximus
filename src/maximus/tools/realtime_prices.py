@@ -7,6 +7,7 @@ from typing import Dict, Optional, Set, Callable
 from datetime import datetime
 import websockets
 from websockets.client import WebSocketClientProtocol
+from websockets.exceptions import ConnectionClosed, ConnectionClosedError, ConnectionClosedOK
 import logging
 
 logger = logging.getLogger(__name__)
@@ -150,10 +151,15 @@ class WebsocketManager:
         if self.running or not REALTIME_ENABLED:
             return
         
+        # Warn if API key is missing
+        if not COINGECKO_API_KEY:
+            logger.warning("CoinGecko API key not found - websocket streaming will not work")
+            return
+        
         self.running = True
         self.thread = threading.Thread(target=self._run_event_loop, daemon=True)
         self.thread.start()
-        logger.info("WebsocketManager started")
+        logger.debug("WebsocketManager started - connecting to CoinGecko streaming API")
     
     def stop(self):
         """Gracefully stop the websocket manager."""
@@ -199,92 +205,172 @@ class WebsocketManager:
     
     async def _handle_cg_simple_price(self):
         """Handle CGSimplePrice channel connection and messages."""
+        # Wait briefly for initial tokens to be subscribed
+        for _ in range(5):
+            if self.cg_tokens:
+                break
+            await asyncio.sleep(0.5)
+        
         if not self.cg_tokens:
-            await asyncio.sleep(1)
+            # No tokens after waiting, sleep and retry
+            await asyncio.sleep(5)
             return
         
         try:
-            async with websockets.connect(WEBSOCKET_URL) as ws:
+            async with websockets.connect(WEBSOCKET_URL, ping_interval=20, ping_timeout=10) as ws:
                 self.cg_ws = ws
                 self.reconnect_delay = 1  # Reset on successful connection
+                logger.debug("CGSimplePrice websocket connected")
                 
                 # Subscribe to channel
-                await ws.send(json.dumps({
+                subscribe_msg = {
                     "command": "subscribe",
                     "identifier": json.dumps({"channel": "CGSimplePrice"})
-                }))
+                }
+                await ws.send(json.dumps(subscribe_msg))
+                logger.debug(f"Sent channel subscription: {subscribe_msg}")
                 
                 # Wait for confirmation
                 response = await ws.recv()
-                logger.debug(f"CGSimplePrice subscription response: {response}")
+                logger.debug(f"CGSimplePrice channel response: {response}")
                 
-                # Subscribe to tokens
+                # Subscribe to tokens if we have any
                 if self.cg_tokens:
-                    await ws.send(json.dumps({
+                    token_msg = {
                         "command": "message",
                         "identifier": json.dumps({"channel": "CGSimplePrice"}),
                         "data": json.dumps({
                             "coin_id": list(self.cg_tokens),
                             "action": "set_tokens"
                         })
-                    }))
+                    }
+                    await ws.send(json.dumps(token_msg))
+                    logger.debug(f"CGSimplePrice: Subscribed to {len(self.cg_tokens)} tokens")
+                
+                # Keep track of subscribed tokens
+                last_token_set = set(self.cg_tokens)
                 
                 # Listen for messages
-                while self.running and self.cg_tokens:
+                while self.running:
                     try:
-                        message = await asyncio.wait_for(ws.recv(), timeout=30)
+                        # Check if token list changed
+                        current_tokens = set(self.cg_tokens)
+                        if current_tokens != last_token_set and current_tokens:
+                            # Update subscription
+                            token_msg = {
+                                "command": "message",
+                                "identifier": json.dumps({"channel": "CGSimplePrice"}),
+                                "data": json.dumps({
+                                    "coin_id": list(current_tokens),
+                                    "action": "set_tokens"
+                                })
+                            }
+                            await ws.send(json.dumps(token_msg))
+                            logger.debug(f"Updated subscription to {len(current_tokens)} tokens")
+                            last_token_set = current_tokens
+                        
+                        # Receive messages
+                        message = await asyncio.wait_for(ws.recv(), timeout=5)
                         await self._process_cg_message(message)
+                        
                     except asyncio.TimeoutError:
-                        # Send ping to keep connection alive
-                        await ws.ping()
+                        # Timeout is normal, just continue
+                        continue
                 
+        except (ConnectionClosed, ConnectionClosedError, ConnectionClosedOK):
+            # Silently handle normal connection closures (common during idle times)
+            logger.debug("CGSimplePrice connection closed normally")
+            await asyncio.sleep(self.reconnect_delay)
         except Exception as e:
-            logger.warning(f"CGSimplePrice connection error: {e}")
+            # Only log unexpected errors
+            error_msg = str(e)
+            if "connection" not in error_msg.lower() and "close" not in error_msg.lower():
+                logger.error(f"CGSimplePrice error: {error_msg}")
             await asyncio.sleep(self.reconnect_delay)
     
     async def _handle_onchain_token_price(self):
         """Handle OnchainSimpleTokenPrice channel connection and messages."""
+        # Wait briefly for initial tokens to be subscribed
+        for _ in range(5):
+            if self.onchain_tokens:
+                break
+            await asyncio.sleep(0.5)
+        
         if not self.onchain_tokens:
-            await asyncio.sleep(1)
+            # No tokens after waiting, sleep and retry
+            await asyncio.sleep(5)
             return
         
         try:
-            async with websockets.connect(WEBSOCKET_URL) as ws:
+            async with websockets.connect(WEBSOCKET_URL, ping_interval=20, ping_timeout=10) as ws:
                 self.onchain_ws = ws
                 self.reconnect_delay = 1  # Reset on successful connection
+                logger.debug("OnchainSimpleTokenPrice websocket connected")
                 
                 # Subscribe to channel
-                await ws.send(json.dumps({
+                subscribe_msg = {
                     "command": "subscribe",
                     "identifier": json.dumps({"channel": "OnchainSimpleTokenPrice"})
-                }))
+                }
+                await ws.send(json.dumps(subscribe_msg))
+                logger.debug(f"Sent channel subscription: {subscribe_msg}")
                 
                 # Wait for confirmation
                 response = await ws.recv()
-                logger.debug(f"OnchainSimpleTokenPrice subscription response: {response}")
+                logger.debug(f"OnchainSimpleTokenPrice channel response: {response}")
                 
-                # Subscribe to tokens
+                # Subscribe to tokens if we have any
                 if self.onchain_tokens:
-                    await ws.send(json.dumps({
+                    token_msg = {
                         "command": "message",
                         "identifier": json.dumps({"channel": "OnchainSimpleTokenPrice"}),
                         "data": json.dumps({
                             "network_id:token_addresses": list(self.onchain_tokens),
                             "action": "set_tokens"
                         })
-                    }))
+                    }
+                    await ws.send(json.dumps(token_msg))
+                    logger.debug(f"OnchainSimpleTokenPrice: Subscribed to {len(self.onchain_tokens)} tokens")
+                
+                # Keep track of subscribed tokens
+                last_token_set = set(self.onchain_tokens)
                 
                 # Listen for messages
-                while self.running and self.onchain_tokens:
+                while self.running:
                     try:
-                        message = await asyncio.wait_for(ws.recv(), timeout=30)
+                        # Check if token list changed
+                        current_tokens = set(self.onchain_tokens)
+                        if current_tokens != last_token_set and current_tokens:
+                            # Update subscription
+                            token_msg = {
+                                "command": "message",
+                                "identifier": json.dumps({"channel": "OnchainSimpleTokenPrice"}),
+                                "data": json.dumps({
+                                    "network_id:token_addresses": list(current_tokens),
+                                    "action": "set_tokens"
+                                })
+                            }
+                            await ws.send(json.dumps(token_msg))
+                            logger.debug(f"Updated subscription to {len(current_tokens)} onchain tokens")
+                            last_token_set = current_tokens
+                        
+                        # Receive messages
+                        message = await asyncio.wait_for(ws.recv(), timeout=5)
                         await self._process_onchain_message(message)
+                        
                     except asyncio.TimeoutError:
-                        # Send ping to keep connection alive
-                        await ws.ping()
+                        # Timeout is normal, just continue
+                        continue
                 
+        except (ConnectionClosed, ConnectionClosedError, ConnectionClosedOK):
+            # Silently handle normal connection closures
+            logger.debug("OnchainSimpleTokenPrice connection closed normally")
+            await asyncio.sleep(self.reconnect_delay)
         except Exception as e:
-            logger.warning(f"OnchainSimpleTokenPrice connection error: {e}")
+            # Only log unexpected errors
+            error_msg = str(e)
+            if "connection" not in error_msg.lower() and "close" not in error_msg.lower():
+                logger.error(f"OnchainSimpleTokenPrice error: {error_msg}")
             await asyncio.sleep(self.reconnect_delay)
     
     async def _process_cg_message(self, message: str):
@@ -292,9 +378,22 @@ class WebsocketManager:
         try:
             data = json.loads(message)
             
-            # Handle subscription confirmation or status messages
-            if isinstance(data, dict) and ("type" in data or "code" in data):
-                logger.debug(f"CGSimplePrice status: {data}")
+            # Handle subscription confirmation messages
+            if isinstance(data, dict) and data.get("type") == "confirm_subscription":
+                logger.debug(f"CGSimplePrice channel confirmed: {data}")
+                return
+            
+            # Handle status/code messages (subscription success, errors, etc)
+            if isinstance(data, dict) and "code" in data:
+                code = data.get("code")
+                message_text = data.get("message", "")
+                if code == 2000:
+                    logger.debug(f"CGSimplePrice: {message_text}")
+                elif code == 4008:
+                    # Silently ignore invalid coin ID errors (common for abbreviated names)
+                    logger.debug(f"CGSimplePrice: Invalid coin ID - {message_text}")
+                else:
+                    logger.warning(f"CGSimplePrice status {code}: {message_text}")
                 return
             
             # Handle price data
@@ -311,19 +410,35 @@ class WebsocketManager:
                         last_updated=data.get("t")
                     )
                     self.cache.set(coin_id, price_data)
-                    logger.debug(f"Updated {coin_id}: ${price}")
+                    logger.debug(f"Price update: {coin_id} = ${price}")
+            else:
+                # Log unexpected message format for debugging
+                logger.debug(f"Unhandled CGSimplePrice message: {message[:200]}")
         
         except Exception as e:
-            logger.error(f"Error processing CG message: {e}")
+            logger.error(f"Error processing CG message: {e} | Message: {message[:100]}")
     
     async def _process_onchain_message(self, message: str):
         """Process a message from OnchainSimpleTokenPrice channel."""
         try:
             data = json.loads(message)
             
-            # Handle subscription confirmation or status messages
-            if isinstance(data, dict) and ("type" in data or "code" in data):
-                logger.debug(f"OnchainSimpleTokenPrice status: {data}")
+            # Handle subscription confirmation messages
+            if isinstance(data, dict) and data.get("type") == "confirm_subscription":
+                logger.debug(f"OnchainSimpleTokenPrice channel confirmed: {data}")
+                return
+            
+            # Handle status/code messages (subscription success, errors, etc)
+            if isinstance(data, dict) and "code" in data:
+                code = data.get("code")
+                message_text = data.get("message", "")
+                if code == 2000:
+                    logger.debug(f"OnchainSimpleTokenPrice: {message_text}")
+                elif code == 4008:
+                    # Silently ignore invalid token/network errors
+                    logger.debug(f"OnchainSimpleTokenPrice: Invalid token - {message_text}")
+                else:
+                    logger.warning(f"OnchainSimpleTokenPrice status {code}: {message_text}")
                 return
             
             # Handle price data
@@ -348,13 +463,16 @@ class WebsocketManager:
                     for name, addr in SOLANA_TOKEN_ADDRESSES.items():
                         if token_address.lower() == addr.lower():
                             self.cache.set(name, price_data)
-                            logger.debug(f"Updated {name} ({network_id}): ${price}")
+                            logger.debug(f"Price update: {name} ({network_id}) = ${price}")
                             break
                     else:
-                        logger.debug(f"Updated {network_id}:{token_address}: ${price}")
+                        logger.debug(f"Price update: {network_id}:{token_address} = ${price}")
+            else:
+                # Log unexpected message format for debugging
+                logger.debug(f"Unhandled OnchainSimpleTokenPrice message: {message[:200]}")
         
         except Exception as e:
-            logger.error(f"Error processing onchain message: {e}")
+            logger.error(f"Error processing onchain message: {e} | Message: {message[:100]}")
     
     async def _cleanup(self):
         """Clean up websocket connections."""

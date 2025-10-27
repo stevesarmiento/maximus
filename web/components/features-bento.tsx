@@ -34,8 +34,8 @@ export function FeaturesBento() {
         <div className="border-r border-b border-sand-1400 min-h-[400px] col-span-7">
           <FeatureBox
             icon={<IconBrain className="w-12 h-12" />}
-            title="Autonomous Planning"
-            description="Maximus thinks ahead. It breaks down complex queries into actionable steps, executes them with precision, and validates results before responding. No hand-holding required."
+            title="In the Flow"
+            description="A powertool for deep-focus analysis, fast and frictionless execution, and split-second decision making."
             className="h-full"
           />
         </div>
@@ -44,8 +44,8 @@ export function FeaturesBento() {
         <div className="border-b border-sand-1400 min-h-[200px] col-span-5">
           <FeatureBox
             icon={<IconBolt className="w-10 h-10" />}
-            title="Real-Time Execution"
-            description="Direct access to market data, on-chain transactions, and live swap quotes. Execute trades with natural language commands."
+            title="Plugged in, Onchain"
+            description="Direct access to agentic driven on-chain operations."
             className="h-full"
           />
         </div>
@@ -54,8 +54,8 @@ export function FeaturesBento() {
         <div className="border-r min-h-[200px] col-span-5">
           <FeatureBox
             icon={<IconChartBarXaxisAscending className="w-10 h-10" />}
-            title="Market Intelligence"
-            description="Live price data, OHLC charts, and comprehensive portfolio analysis powered by CoinGecko API."
+            title="Fully Self-Custodial"
+            description="Delegate signing authority to Maximus while maintaining full asset control. Revoke access anytime."
             className="h-full"
           />
         </div>
@@ -64,8 +64,8 @@ export function FeaturesBento() {
         <div className="min-h-[400px] col-span-7">
           <FeatureBox
             icon={<IconShield className="w-12 h-12" />}
-            title="Secure Delegation"
-            description="Set spending limits and time-based controls for autonomous operations. Your delegate wallet is encrypted locally with password protection you control."
+            title="Risk-Aware Execution"
+            description="Intelligent position sizing, real-time market analysis, and configurable guardrails prevent overexposure while maximizing alpha."
             className="h-full"
           />
         </div>

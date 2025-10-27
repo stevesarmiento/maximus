@@ -2,10 +2,21 @@ import uuid
 import os
 import shutil
 import threading
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging to suppress verbose websocket errors
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(levelname)s: %(message)s'
+)
+# Suppress websocket library logs unless they're errors
+logging.getLogger('websockets').setLevel(logging.ERROR)
+# Suppress realtime prices info logs (they're noisy at startup)
+logging.getLogger('maximus.tools.realtime_prices').setLevel(logging.WARNING)
 
 from maximus.agent import Agent
 from maximus.tools.memory import clear_memories
@@ -55,7 +66,9 @@ def execute_command(command_name: str, state: AppState) -> str:
     Returns:
         str: Message to display (or None)
     """
-    if command_name == "/clear":
+    if command_name == "/liveprices":
+        return "LIVEPRICES_INTERACTIVE"
+    elif command_name == "/clear":
         clear_memories(state.session_id)
         return "Memory cleared"
     elif command_name == "/balances":
@@ -463,6 +476,18 @@ def handle_revoke_delegate_interactive():
         input("Press Enter to continue...")
 
 
+def handle_liveprices_interactive():
+    """Handle /liveprices command interactively (outside prompt_toolkit)."""
+    from maximus.utils.live_prices import show_live_prices
+    
+    try:
+        show_live_prices(limit=10)
+    except Exception as e:
+        from maximus.utils.ui import Colors
+        print(f"\n{Colors.RED}Error displaying live prices:{Colors.ENDC} {str(e)}\n")
+        input("Press Enter to continue...")
+
+
 def create_application(state: AppState):
     """Create and configure the prompt_toolkit Application."""
     
@@ -651,7 +676,11 @@ def main():
             # Handle command messages
             if state.command_message:
                 # Handle interactive commands
-                if state.command_message == "EXPORT_DELEGATE_INTERACTIVE":
+                if state.command_message == "LIVEPRICES_INTERACTIVE":
+                    handle_liveprices_interactive()
+                    state.command_message = None
+                    continue
+                elif state.command_message == "EXPORT_DELEGATE_INTERACTIVE":
                     handle_export_delegate_interactive()
                     state.command_message = None
                     continue

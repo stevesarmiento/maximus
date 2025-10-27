@@ -39,6 +39,7 @@ class CommandPalette:
         
         # Define available commands
         self.commands = [
+            Command("/liveprices", ["live", "prices", "monitor"], "Live price monitor - Top 25 tokens"),
             Command("/balances", ["bal", "wallet"], "Show Solana wallet balances"),
             Command("/transactions", ["txs", "history"], "Show recent Solana transactions"),
             Command("/delegate", ["deleg"], "Show delegation status"),
