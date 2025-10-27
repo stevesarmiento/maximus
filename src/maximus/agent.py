@@ -13,6 +13,7 @@ from maximus.prompts import (
 from maximus.schemas import Answer, IsDone, OptimizedToolArgs, Task, TaskList
 from maximus.tools import TOOLS
 from maximus.tools.memory import add_memory, retrieve_context
+from maximus.tools.realtime_prices import initialize_realtime_prices, shutdown_realtime_prices
 from maximus.utils.logger import Logger
 from maximus.utils.status_bar import (
     get_status_bar,
@@ -32,6 +33,18 @@ class Agent:
         self.max_steps_per_task = max_steps_per_task
         self.session_id = session_id          # unique identifier for memory isolation
         self.status_bar = get_status_bar()    # inline status bar for progress
+        
+        # Initialize real-time price streaming with common tokens
+        # These will start streaming immediately for instant price access
+        common_tokens = ["sol", "btc", "eth", "usdc", "bonk", "usdt"]
+        initialize_realtime_prices(common_tokens)
+    
+    def __del__(self):
+        """Cleanup when agent is destroyed."""
+        try:
+            shutdown_realtime_prices()
+        except:
+            pass  # Ignore errors during cleanup
 
     # ---------- task planning ----------
     @with_planning("Planning tasks...", "Tasks planned")

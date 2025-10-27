@@ -3,7 +3,11 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from maximus.tools.api import call_api, resolve_crypto_identifier
 from maximus.utils.charts import render_candlestick_chart, render_line_chart
+from maximus.tools.realtime_prices import get_price_cache, get_websocket_manager, SOLANA_TOKEN_ADDRESSES
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 ####################################
 # Tools
@@ -26,9 +30,33 @@ def get_price_snapshot(identifier: str, vs_currency: str = "usd") -> dict:
     including current price, market cap, 24h volume, price changes, and other key metrics.
     
     Use this to get the most recent market data for a specific cryptocurrency.
+    Uses real-time websocket data when available for instant, up-to-date prices.
     """
     coin_id = resolve_crypto_identifier(identifier)
+    cache = get_price_cache()
+    manager = get_websocket_manager()
     
+    # Check cache first for real-time price
+    cached_price = cache.get(coin_id)
+    use_realtime = False
+    
+    if cached_price and vs_currency.lower() == "usd":
+        # We have real-time data! Use it for price fields
+        use_realtime = True
+        logger.debug(f"Using real-time cached price for {coin_id}: ${cached_price.price}")
+    else:
+        # Not in cache yet - subscribe for future requests
+        identifier_lower = identifier.lower()
+        if identifier_lower in SOLANA_TOKEN_ADDRESSES:
+            address = SOLANA_TOKEN_ADDRESSES[identifier_lower]
+            manager.subscribe_onchain_token("solana", address)
+            logger.debug(f"Auto-subscribed {identifier_lower} to OnchainSimpleTokenPrice")
+        else:
+            manager.subscribe_cg_token(coin_id)
+            logger.debug(f"Auto-subscribed {coin_id} to CGSimplePrice")
+    
+    # Always fetch from REST API for complete data
+    # (websocket only provides price, market cap, volume, 24h change)
     data = call_api(
         f"/coins/{coin_id}",
         params={
@@ -43,18 +71,32 @@ def get_price_snapshot(identifier: str, vs_currency: str = "usd") -> dict:
     # Extract relevant market data
     market_data = data.get("market_data", {})
     
+    # Use real-time data for price-related fields if available
+    if use_realtime and cached_price:
+        current_price = cached_price.price
+        market_cap = cached_price.market_cap if cached_price.market_cap else market_data.get("market_cap", {}).get(vs_currency)
+        total_volume = cached_price.volume_24h if cached_price.volume_24h else market_data.get("total_volume", {}).get(vs_currency)
+        price_change_pct_24h = cached_price.price_change_24h_pct if cached_price.price_change_24h_pct else market_data.get("price_change_percentage_24h")
+        data_source = "realtime_websocket"
+    else:
+        current_price = market_data.get("current_price", {}).get(vs_currency)
+        market_cap = market_data.get("market_cap", {}).get(vs_currency)
+        total_volume = market_data.get("total_volume", {}).get(vs_currency)
+        price_change_pct_24h = market_data.get("price_change_percentage_24h")
+        data_source = "rest_api"
+    
     snapshot = {
         "id": data.get("id"),
         "symbol": data.get("symbol", "").upper(),
         "name": data.get("name"),
-        "current_price": market_data.get("current_price", {}).get(vs_currency),
-        "market_cap": market_data.get("market_cap", {}).get(vs_currency),
+        "current_price": current_price,
+        "market_cap": market_cap,
         "market_cap_rank": market_data.get("market_cap_rank"),
-        "total_volume": market_data.get("total_volume", {}).get(vs_currency),
+        "total_volume": total_volume,
         "high_24h": market_data.get("high_24h", {}).get(vs_currency),
         "low_24h": market_data.get("low_24h", {}).get(vs_currency),
         "price_change_24h": market_data.get("price_change_24h"),
-        "price_change_percentage_24h": market_data.get("price_change_percentage_24h"),
+        "price_change_percentage_24h": price_change_pct_24h,
         "price_change_percentage_7d": market_data.get("price_change_percentage_7d"),
         "price_change_percentage_30d": market_data.get("price_change_percentage_30d"),
         "circulating_supply": market_data.get("circulating_supply"),
@@ -65,6 +107,7 @@ def get_price_snapshot(identifier: str, vs_currency: str = "usd") -> dict:
         "atl": market_data.get("atl", {}).get(vs_currency),
         "atl_date": market_data.get("atl_date", {}).get(vs_currency),
         "last_updated": market_data.get("last_updated"),
+        "data_source": data_source,  # Indicate whether real-time or REST was used
     }
     
     return snapshot
