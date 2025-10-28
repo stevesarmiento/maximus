@@ -6,6 +6,7 @@ import threading
 import logging
 import json
 import argparse
+import re
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -40,6 +41,12 @@ from prompt_toolkit.formatted_text import FormattedText
 def get_terminal_width():
     """Get current terminal width."""
     return shutil.get_terminal_size().columns
+
+
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI color codes from text for clean output."""
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    return ansi_escape.sub('', text)
 
 
 class AppState:
@@ -254,7 +261,7 @@ def execute_delegate_command() -> str:
         delegate = get_delegate_wallet()
         
         if not delegate.delegation_exists():
-            return f"\n{Colors.YELLOW}No delegation found.{Colors.ENDC}\n\nTo create a delegation:\n1. Visit the web dashboard at http://localhost:3000/delegate\n2. Connect your wallet and set delegation limits\n3. A delegate wallet will be created automatically\n"
+            return f"{Colors.YELLOW}No delegation found.{Colors.ENDC}\nTo create a delegation:\n1. Visit the web dashboard at http://localhost:3000/delegate\n2. Connect your wallet and set delegation limits\n3. A delegate wallet will be created automatically"
         
         # Try to get cached password first
         password = get_session_password()
@@ -275,7 +282,7 @@ def execute_delegate_command() -> str:
         config = delegate.get_delegation_info(password)
         
         if not config:
-            return f"{Colors.RED}Failed to load delegation.{Colors.ENDC} Invalid password or corrupted file."
+            return f"{Colors.RED}Failed to load delegation.{Colors.ENDC}\nInvalid password or corrupted file."
         
         # Check if expired
         from datetime import datetime, timezone
@@ -306,7 +313,7 @@ def execute_delegate_command() -> str:
         return "\n".join(output_lines)
     
     except Exception as e:
-        return f"{Colors.RED}Error checking delegation:{Colors.ENDC} {str(e)}"
+        return f"{Colors.RED}Error checking delegation.{Colors.ENDC}\n{str(e)}"
 
 
 def execute_export_delegate_command() -> str:
@@ -319,7 +326,7 @@ def execute_export_delegate_command() -> str:
         delegate = get_delegate_wallet()
         
         if not delegate.delegation_exists():
-            return f"\n{Colors.YELLOW}No delegation found to export.{Colors.ENDC}\n"
+            return f"{Colors.YELLOW}No delegation found to export.{Colors.ENDC}\nCreate a delegation first using the web dashboard at http://localhost:3000/delegate"
         
         # Try to get cached password
         password = get_session_password()
@@ -331,7 +338,7 @@ def execute_export_delegate_command() -> str:
                 return "EXPORT_DELEGATE_INTERACTIVE"
             else:
                 # In JSON/non-interactive mode without cached password
-                return f"{Colors.YELLOW}Delegation password required.{Colors.ENDC}\nPlease unlock delegation first with /delegate command."
+                return f"{Colors.YELLOW}Delegation password required.{Colors.ENDC}\nPlease unlock delegation first with the /delegate command."
         
         # Export keypair with cached password
         export_data = delegate.export_keypair(password)
@@ -355,7 +362,7 @@ def execute_export_delegate_command() -> str:
         return "\n".join(output_lines)
     
     except Exception as e:
-        return f"{Colors.RED}Error exporting delegate:{Colors.ENDC} {str(e)}"
+        return f"{Colors.RED}Error exporting delegate.{Colors.ENDC}\n{str(e)}"
 
 
 def execute_import_delegate_command() -> str:
@@ -839,16 +846,24 @@ def run_json_mode():
                 break
             elif query == "/balances":
                 result = execute_balances_command()
-                response = {"type": "command_result", "command": "balances", "result": result}
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "balances", "result": clean_result}
             elif query == "/transactions":
                 result = execute_transactions_command()
-                response = {"type": "command_result", "command": "transactions", "result": result}
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "transactions", "result": clean_result}
             elif query == "/delegate":
                 result = execute_delegate_command()
-                response = {"type": "command_result", "command": "delegate", "result": result}
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "delegate", "result": clean_result}
             elif query == "/export-delegate":
                 result = execute_export_delegate_command()
-                response = {"type": "command_result", "command": "export_delegate", "result": result}
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "export_delegate", "result": clean_result}
             elif query.startswith("/set-delegation-password "):
                 # Extract password from command
                 password = query.replace("/set-delegation-password ", "").strip()

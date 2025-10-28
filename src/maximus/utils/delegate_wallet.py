@@ -397,7 +397,16 @@ def process_temp_delegation() -> bool:
         # Get encryption key from environment
         encryption_key_hex = os.getenv('DELEGATION_ENCRYPTION_KEY')
         if not encryption_key_hex:
-            print("⚠️  DELEGATION_ENCRYPTION_KEY not set. Cannot decrypt delegation.")
+            if not sys.stdin.isatty():
+                # JSON mode
+                error_msg = {
+                    "type": "delegation_error",
+                    "error": "DELEGATION_ENCRYPTION_KEY not set in environment"
+                }
+                print(json.dumps(error_msg), flush=True)
+            else:
+                # Interactive mode
+                print("⚠️  DELEGATION_ENCRYPTION_KEY not set. Cannot decrypt delegation.")
             return False
         
         encryption_key = bytes.fromhex(encryption_key_hex)
