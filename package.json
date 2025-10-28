@@ -8,7 +8,12 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "uv pip install ."
+    "postinstall": "uv pip install .",
+    "dev:desktop": "cd src-desktop && npm run dev",
+    "build:desktop": "cd src-desktop && npm run build",
+    "tauri:dev": "cd src-tauri && npx @tauri-apps/cli dev",
+    "tauri:build": "cd src-tauri && npx @tauri-apps/cli build",
+    "install:desktop": "cd src-desktop && npm install"
   },
   "keywords": [],
   "author": "Steven Sarmi",

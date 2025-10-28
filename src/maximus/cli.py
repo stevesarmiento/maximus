@@ -1,8 +1,11 @@
 import uuid
 import os
+import sys
 import shutil
 import threading
 import logging
+import json
+import argparse
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -650,7 +653,177 @@ def create_application(state: AppState):
     return app, input_buffer
 
 
+class JSONStatusBar:
+    """Status bar that outputs JSON events for the native app."""
+    
+    def __init__(self):
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+        self.is_animating = False
+        self.animation_thread = None
+        self._frame_idx = 0
+    
+    def start_phase(self, phase, message, details=""):
+        """Emit status update as JSON."""
+        self.current_phase = phase.value if hasattr(phase, 'value') else phase
+        self.current_message = message
+        self.details = details
+        self.is_animating = True
+        
+        status = {
+            "type": "status",
+            "phase": self.current_phase,
+            "message": message,
+            "details": details
+        }
+        print(json.dumps(status), flush=True)
+    
+    def complete_phase(self, final_message="", show_completion=False):
+        """Emit completion status."""
+        self.is_animating = False
+        
+        if show_completion and final_message:
+            status = {
+                "type": "status",
+                "phase": "complete",
+                "message": final_message,
+                "details": ""
+            }
+            print(json.dumps(status), flush=True)
+        
+        # Reset state
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+    
+    def error_phase(self, error_message, show_on_newline=True):
+        """Emit error status."""
+        self.is_animating = False
+        
+        status = {
+            "type": "status",
+            "phase": "error",
+            "message": error_message,
+            "details": ""
+        }
+        print(json.dumps(status), flush=True)
+        
+        # Reset state
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+    
+    def transition_to(self, phase, message, details=""):
+        """Transition to a new phase."""
+        self.start_phase(phase, message, details)
+    
+    def update_details(self, details):
+        """Update details."""
+        self.details = details
+    
+    def clear(self):
+        """Clear status."""
+        self.is_animating = False
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+    
+    def show_static(self, message, symbol="", color=""):
+        """Show static message."""
+        status = {
+            "type": "status",
+            "phase": "info",
+            "message": message,
+            "details": ""
+        }
+        print(json.dumps(status), flush=True)
+
+
+def run_json_mode():
+    """Run agent in JSON mode for programmatic access (e.g., from Tauri app)."""
+    import sys
+    from io import StringIO
+    
+    session_id = str(uuid.uuid4())
+    
+    # Redirect agent's status bar to JSON output
+    from maximus.utils import status_bar as sb_module
+    json_status_bar = JSONStatusBar()
+    sb_module._global_status_bar = json_status_bar
+    
+    # Suppress logger output in JSON mode (we want clean JSON only)
+    from maximus.utils import logger as logger_module
+    
+    class QuietLogger:
+        """Logger that doesn't print anything in JSON mode."""
+        def log_user_query(self, query): pass
+        def log_task_list(self, tasks): pass
+        def log_task_start(self, task): pass
+        def log_task_done(self, task): pass
+        def log_summary(self, answer): pass
+        def _log(self, message): pass
+    
+    # Override the logger
+    logger_module.Logger = QuietLogger
+    
+    agent = Agent(session_id=session_id)
+    
+    # Output ready signal
+    print(json.dumps({"type": "ready", "session_id": session_id}), flush=True)
+    
+    # Read queries from stdin and output JSON responses
+    for line in sys.stdin:
+        try:
+            query = line.strip()
+            if not query:
+                continue
+            
+            # Handle special commands
+            if query == "/clear":
+                clear_memories(session_id)
+                response = {"type": "command", "command": "clear", "message": "💾 Memory cleared"}
+            elif query in ["exit", "quit"]:
+                clear_memories(session_id, silent=True)
+                response = {"type": "exit", "message": "Goodbye!"}
+                print(json.dumps(response), flush=True)
+                break
+            elif query == "/balances":
+                result = execute_balances_command()
+                response = {"type": "command_result", "command": "balances", "result": result}
+            elif query == "/transactions":
+                result = execute_transactions_command()
+                response = {"type": "command_result", "command": "transactions", "result": result}
+            elif query == "/delegate":
+                result = execute_delegate_command()
+                response = {"type": "command_result", "command": "delegate", "result": result}
+            else:
+                # Regular query - run through agent
+                try:
+                    answer = agent.run(query)
+                    response = {"type": "answer", "query": query, "answer": answer}
+                except Exception as e:
+                    response = {"type": "error", "query": query, "error": str(e)}
+            
+            # Output JSON response
+            print(json.dumps(response), flush=True)
+            
+        except Exception as e:
+            error_response = {"type": "error", "error": str(e)}
+            print(json.dumps(error_response), flush=True)
+
+
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Maximus - Autonomous Solana Agent")
+    parser.add_argument('--json', action='store_true', help='Run in JSON mode for programmatic access')
+    args = parser.parse_args()
+    
+    # Run in JSON mode if requested
+    if args.json:
+        run_json_mode()
+        return
+    
     # Generate a unique session ID for this CLI session
     session_id = str(uuid.uuid4())
     
