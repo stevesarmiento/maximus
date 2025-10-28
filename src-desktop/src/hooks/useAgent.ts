@@ -173,6 +173,18 @@ export function useAgent() {
     setMessages([]);
   }, []);
 
+  const setDelegationPassword = useCallback(async (password: string): Promise<boolean> => {
+    try {
+      const response = await invoke<QueryResponse>('send_query', { 
+        query: `/set-delegation-password ${password}` 
+      });
+      return response.success;
+    } catch (error) {
+      console.error('Failed to set delegation password:', error);
+      return false;
+    }
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -185,6 +197,7 @@ export function useAgent() {
     getTransactions,
     openWalletManager,
     checkStatus,
+    setDelegationPassword,
   };
 }
 

@@ -35,46 +35,28 @@ function matchesFilter(command: Command, filter: string): boolean {
 
 export function CommandPalette({ isExpanded, filterText, selectedIndex }: CommandPaletteProps) {
   if (!isExpanded) {
-    return (
-      <div style={{
-        padding: '10px 20px',
-        fontSize: '0.75em',
-        color: 'var(--text-muted)',
-      }}>
-        Type '/' to see all commands
-      </div>
-    );
+    return null;
   }
 
   const filteredCommands = COMMANDS.filter(cmd => matchesFilter(cmd, filterText));
 
   return (
-    <div style={{
-      padding: '10px 0',
-      fontSize: '0.85em',
-      maxHeight: '400px',
-      overflowY: 'auto',
-    }}>
+    <div className="command-palette">
       {filteredCommands.length === 0 ? (
-        <div style={{ padding: '0 20px', color: 'var(--text-muted)' }}>
+        <div className="command-palette-empty">
           No commands found
         </div>
       ) : (
         filteredCommands.map((cmd, index) => (
           <div
             key={cmd.name}
-            style={{
-              padding: '8px 20px',
-              display: 'flex',
-              gap: '20px',
-              backgroundColor: index === selectedIndex ? 'rgba(255, 175, 95, 0.1)' : 'transparent',
-              color: index === selectedIndex ? 'var(--accent-orange)' : 'var(--text-primary)',
-            }}
+            className="command-palette-item"
+            data-selected={index === selectedIndex}
           >
-            <div style={{ width: '180px', flexShrink: 0 }}>
+            <div className="command-palette-item-name">
               {cmd.name}
             </div>
-            <div style={{ color: index === selectedIndex ? 'var(--accent-orange)' : 'var(--text-muted)' }}>
+            <div className="command-palette-item-description">
               {cmd.description}
             </div>
           </div>

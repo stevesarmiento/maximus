@@ -1,89 +1,41 @@
+/* Import theme system */
+@import './theme.css';
+@import './base.css';
+@import './utilities.css';
+@import './components.css';
 @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Ghostty theme - Catppuccin Mocha */
-  --bg-primary: #1e1e2e;
-  --bg-secondary: #1e1e2e;
-  --bg-tertiary: #313244;
-  --text-primary: #cdd6f4;
-  --text-secondary: #bac2de;
+  /* Terminal-specific overrides for Catppuccin Mocha aesthetic */
+  --background-base: var(--terminal-bg-primary);
+  --background-panel: var(--terminal-bg-secondary);
+  --text-base: var(--terminal-text-primary);
+  --text-weak: var(--terminal-text-secondary);
   --text-muted: #a6adc8;
-  --selection-bg: #353749;
-  --cursor-color: #f5e0dc;
-  
-  /* Terminal palette colors */
-  --color-black: #45475a;
-  --color-red: #f38ba8;
-  --color-green: #a6e3a1;
-  --color-yellow: #f9e2af;
-  --color-blue: #89b4fa;
-  --color-magenta: #f5c2e7;
-  --color-cyan: #94e2d5;
-  
-  /* Accent colors (using palette) */
-  --accent-orange: #ffaf5f;
-  --accent-green: #a6e3a1;
-  --accent-blue: #89b4fa;
-  --accent-yellow: #f9e2af;
-  --accent-red: #f38ba8;
-  --separator-color: #585b70;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
-  font-size: 14px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  overflow: hidden;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
+  background: var(--background-base);
+  color: var(--text-base);
 }
 
-/* Scrollbar - minimal */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-black);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--separator-color);
-}
-
-/* Code blocks */
+/* Code blocks - Terminal specific */
 code {
-  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
-  background: var(--bg-tertiary);
+  font-family: var(--font-family-mono);
+  background: var(--terminal-bg-tertiary);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 0.9em;
 }
 
 pre {
-  background: var(--bg-tertiary);
-  padding: 12px;
-  border-radius: 6px;
+  background: var(--terminal-bg-tertiary);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-lg);
   overflow-x: auto;
-  margin: 8px 0;
+  margin: var(--spacing-md) 0;
 }
 
 pre code {
@@ -95,48 +47,11 @@ pre code {
 a {
   color: var(--accent-blue);
   text-decoration: none;
+  transition: opacity 0.15s ease;
 }
 
 a:hover {
+  opacity: 0.8;
   text-decoration: underline;
-}
-
-/* Status indicators */
-.status-running {
-  color: var(--accent-green);
-}
-
-.status-stopped {
-  color: var(--accent-red);
-}
-
-.status-thinking {
-  color: var(--accent-blue);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* Price indicators */
-.price-up {
-  color: var(--accent-green);
-}
-
-.price-down {
-  color: var(--accent-red);
-}
-
-/* Selection */
-::selection {
-  background: var(--selection-bg);
-  color: var(--text-primary);
-}
-
-::-moz-selection {
-  background: var(--selection-bg);
-  color: var(--text-primary);
 }
 

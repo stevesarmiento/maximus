@@ -4,17 +4,13 @@ import { MessageList } from './MessageList';
 import { IntroScreen } from './IntroScreen';
 import { CommandPalette, COMMANDS } from './CommandPalette';
 import { StatusIndicator } from './StatusIndicator';
+import { PasswordDialog } from './PasswordDialog';
+import '../styles/terminal-layout.css';
+import '../styles/password-dialog.css';
 
 function Separator() {
   return (
-    <div style={{
-      color: 'var(--separator-color)',
-      fontSize: '0.9em',
-      letterSpacing: '0.05em',
-      userSelect: 'none',
-      overflow: 'hidden',
-      whiteSpace: 'nowrap',
-    }}>
+    <div className="terminal-separator">
       {'·'.repeat(200)}
     </div>
   );
@@ -26,6 +22,8 @@ export function Terminal() {
   const [paletteExpanded, setPaletteExpanded] = useState(false);
   const [paletteFilter, setPaletteFilter] = useState('');
   const [paletteIndex, setPaletteIndex] = useState(0);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [pendingCommand, setPendingCommand] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
   const {
@@ -36,6 +34,7 @@ export function Terminal() {
     clearMessages,
     getWalletBalances,
     getTransactions,
+    setDelegationPassword,
   } = useAgent();
 
   useEffect(() => {
@@ -44,23 +43,34 @@ export function Terminal() {
   }, []);
 
   useEffect(() => {
-    // Hide intro once first message is sent
     if (messages.length > 0 && showIntro) {
       setShowIntro(false);
+    } else if (messages.length === 0 && !showIntro) {
+      setShowIntro(true);
     }
   }, [messages, showIntro]);
 
   useEffect(() => {
-    // Expand palette when "/" is typed
     if (input.startsWith('/') && input.length > 0) {
       setPaletteExpanded(true);
-      setPaletteFilter(input.slice(1)); // Everything after /
+      setPaletteFilter(input.slice(1));
       setPaletteIndex(0);
     } else {
       setPaletteExpanded(false);
       setPaletteFilter('');
     }
   }, [input]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.type === 'agent' && 
+          lastMessage.content.includes('password not cached')) {
+        setShowPasswordDialog(true);
+        setPendingCommand('/delegate');
+      }
+    }
+  }, [messages]);
 
   const getFilteredCommands = () => {
     return COMMANDS.filter(cmd => 
@@ -69,20 +79,30 @@ export function Terminal() {
     );
   };
 
+  const handlePasswordSubmit = async (password: string) => {
+    setShowPasswordDialog(false);
+    const success = await setDelegationPassword(password);
+    if (success && pendingCommand) {
+      await sendQuery(pendingCommand);
+      setPendingCommand(null);
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setShowPasswordDialog(false);
+    setPendingCommand(null);
+  };
+
   const handleSubmit = async () => {
     if (!input.trim() || isLoading) return;
-
     const query = input.trim();
     
-    // Handle command palette selection
     if (paletteExpanded) {
       const filtered = getFilteredCommands();
       if (filtered[paletteIndex]) {
         const selectedCommand = filtered[paletteIndex].name;
         setInput('');
         setPaletteExpanded(false);
-        
-        // Execute the selected command
         if (selectedCommand === '/clear') {
           clearMessages();
           return;
@@ -96,19 +116,14 @@ export function Terminal() {
           return;
         }
         if (selectedCommand === '/exit') {
-          // Could close window here
           return;
         }
-        
-        // For other commands, send as query
         await sendQuery(selectedCommand);
         return;
       }
     }
     
     setInput('');
-
-    // Handle direct command input
     if (query === '/clear') {
       clearMessages();
       return;
@@ -121,8 +136,6 @@ export function Terminal() {
       await getTransactions();
       return;
     }
-
-    // Send regular query
     await sendQuery(query);
   };
 
@@ -148,28 +161,20 @@ export function Terminal() {
   };
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--bg-primary)',
-      color: 'var(--text-primary)',
-      fontFamily: 'Geist Mono, JetBrains Mono, monospace',
-    }}>
-      {/* Intro screen or messages */}
-      {showIntro && messages.length === 0 ? (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+    <div className="terminal-container">
+      <PasswordDialog 
+        isOpen={showPasswordDialog}
+        onSubmit={handlePasswordSubmit}
+        onCancel={handlePasswordCancel}
+      />
+      <div className="terminal-content">
+        {showIntro && messages.length === 0 ? (
           <IntroScreen />
-        </div>
-      ) : (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: '20px' }}>
+        ) : (
+          <div className="terminal-content-inner">
             <MessageList messages={messages} isLoading={isLoading} />
-            
-            {/* Status indicator - always show when loading or has status */}
             {(isLoading || (currentStatus && currentStatus.phase !== 'idle' && currentStatus.phase !== 'complete')) && (
-              <div style={{ marginTop: '8px' }}>
+              <div className="terminal-status-container">
                 <StatusIndicator 
                   phase={currentStatus?.phase || 'planning'}
                   message={currentStatus?.message || 'Processing...'}
@@ -178,36 +183,17 @@ export function Terminal() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Command palette */}
-      {paletteExpanded && (
-        <CommandPalette 
-          isExpanded={paletteExpanded}
-          filterText={paletteFilter}
-          selectedIndex={paletteIndex}
-        />
-      )}
-
-      {/* Input area */}
-      <div style={{ padding: '0 20px 20px 20px' }}>
+        )}
+      </div>
+      <CommandPalette 
+        isExpanded={paletteExpanded}
+        filterText={paletteFilter}
+        selectedIndex={paletteIndex}
+      />
+      <div className="terminal-input-area">
         <Separator />
-        
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          marginTop: '10px',
-          marginBottom: '10px',
-        }}>
-          <span style={{
-            color: 'var(--accent-orange)',
-            marginRight: '8px',
-            fontSize: '1em',
-            flexShrink: 0,
-          }}>
-            {'>>'}
-          </span>
+        <div className="terminal-prompt">
+          <span className="terminal-prompt-symbol">{'>>'}</span>
           <input
             ref={inputRef}
             type="text"
@@ -215,28 +201,13 @@ export function Terminal() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: 'var(--text-primary)',
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: '1em',
-              padding: 0,
-            }}
+            className="terminal-input"
             placeholder={isLoading ? 'Processing...' : ''}
           />
         </div>
-
         <Separator />
-
-        {/* Command hints (only when palette is NOT expanded) */}
-        {!paletteExpanded && (
-          <div style={{
-            marginTop: '10px',
-            color: 'var(--text-muted)',
-          }}>
+        {messages.length === 0 && !paletteExpanded && (
+          <div className="terminal-hint">
             Type '/' to see all commands
           </div>
         )}
@@ -244,4 +215,3 @@ export function Terminal() {
     </div>
   );
 }
-

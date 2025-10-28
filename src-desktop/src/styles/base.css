@@ -1,0 +1,159 @@
+/* CSS Reset and Base Styles */
+
+/*
+  1. Prevent padding and border from affecting element width
+  2. Remove default margins and padding
+  3. Reset all borders
+*/
+
+*,
+::after,
+::before,
+::backdrop {
+  box-sizing: border-box; /* 1 */
+  margin: 0; /* 2 */
+  padding: 0; /* 2 */
+  border: 0 solid; /* 3 */
+}
+
+/*
+  1. Use a consistent sensible line-height in all browsers
+  2. Prevent adjustments of font size after orientation changes in iOS
+  3. Use a more readable tab size
+  4. Use the configured font family
+  5. Disable tap highlights on iOS
+*/
+
+html,
+:host {
+  line-height: var(--line-height-large); /* 1 */
+  -webkit-text-size-adjust: 100%; /* 2 */
+  tab-size: 4; /* 3 */
+  font-family: var(--font-family-sans); /* 4 */
+  -webkit-tap-highlight-color: transparent; /* 5 */
+}
+
+body {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  background: var(--background-base);
+  color: var(--text-base);
+  overflow: hidden;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove the default font size and weight for headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* Reset links to optimize for opt-in styling */
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+/* Add the correct font weight */
+b,
+strong {
+  font-weight: bolder;
+}
+
+/* Code elements */
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-family-mono);
+  font-size: 1em;
+}
+
+/* Make lists unstyled by default */
+ol,
+ul,
+menu {
+  list-style: none;
+}
+
+/* Make replaced elements display: block by default */
+img,
+svg,
+video,
+canvas,
+audio,
+iframe,
+embed,
+object {
+  display: block;
+  vertical-align: middle;
+}
+
+/* Constrain images and videos to parent width */
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Form elements inherit font styles */
+button,
+input,
+select,
+optgroup,
+textarea {
+  font: inherit;
+  font-feature-settings: inherit;
+  font-variation-settings: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background-color: transparent;
+  opacity: 1;
+}
+
+/* Set the default placeholder opacity */
+::placeholder {
+  opacity: 0.5;
+  color: var(--text-weak);
+}
+
+/* Prevent resizing textareas horizontally */
+textarea {
+  resize: vertical;
+}
+
+/* Correct the inability to style buttons */
+button,
+input:where([type="button"], [type="reset"], [type="submit"]) {
+  appearance: button;
+}
+
+/* Make elements with the HTML hidden attribute stay hidden */
+[hidden] {
+  display: none !important;
+}
+
+/* Selection styling */
+::selection {
+  background: var(--terminal-selection-bg);
+  color: var(--terminal-text-primary);
+}
+
+::-moz-selection {
+  background: var(--terminal-selection-bg);
+  color: var(--terminal-text-primary);
+}
+
+/* Focus visible styling */
+:focus-visible {
+  outline: 2px solid var(--text-interactive-base);
+  outline-offset: 2px;
+}
+

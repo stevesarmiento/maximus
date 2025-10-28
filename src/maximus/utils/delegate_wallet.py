@@ -377,12 +377,15 @@ def get_delegate_wallet() -> DelegateWallet:
 def process_temp_delegation() -> bool:
     """
     Check for and process a temporary delegation file from the web dashboard.
+    This file contains encrypted data that needs to be decrypted.
     
     Returns:
         True if a temp file was processed, False otherwise
     """
     from pathlib import Path
     import json
+    import os
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     
     config_dir = Path.home() / ".maximus"
     temp_file = config_dir / "delegate_temp.json"
@@ -391,13 +394,48 @@ def process_temp_delegation() -> bool:
         return False
     
     try:
+        # Get encryption key from environment
+        encryption_key_hex = os.getenv('DELEGATION_ENCRYPTION_KEY')
+        if not encryption_key_hex:
+            print("⚠️  DELEGATION_ENCRYPTION_KEY not set. Cannot decrypt delegation.")
+            return False
+        
+        encryption_key = bytes.fromhex(encryption_key_hex)
+        
         # Read temp file
         with open(temp_file, 'r') as f:
             data = json.load(f)
         
-        # Extract data
-        secret_key_list = data.get('secretKey', [])
-        password = data.get('password', '')
+        # Decrypt secret key
+        encrypted_secret = data.get('encryptedSecretKey', {})
+        secret_ciphertext = bytes.fromhex(encrypted_secret['data'])
+        secret_iv = bytes.fromhex(encrypted_secret['iv'])
+        secret_tag = bytes.fromhex(encrypted_secret['authTag'])
+        
+        # AES-GCM decryption for secret key
+        aesgcm = AESGCM(encryption_key)
+        secret_plaintext = aesgcm.decrypt(
+            secret_iv,
+            secret_ciphertext + secret_tag,
+            None  # no additional authenticated data
+        )
+        secret_key_list = json.loads(secret_plaintext.decode('utf-8'))
+        
+        # Decrypt password
+        encrypted_password = data.get('encryptedPassword', {})
+        password_ciphertext = bytes.fromhex(encrypted_password['data'])
+        password_iv = bytes.fromhex(encrypted_password['iv'])
+        password_tag = bytes.fromhex(encrypted_password['authTag'])
+        
+        # AES-GCM decryption for password
+        password_plaintext = aesgcm.decrypt(
+            password_iv,
+            password_ciphertext + password_tag,
+            None
+        )
+        password = password_plaintext.decode('utf-8')
+        
+        # Extract other data
         delegated_by = data.get('delegatedBy', '')
         max_sol_per_tx = data.get('maxSolPerTx', 1.0)
         max_token_per_tx = data.get('maxTokenPerTx', 100.0)
@@ -410,11 +448,11 @@ def process_temp_delegation() -> bool:
             created = datetime.fromisoformat(data['createdAt'].replace('Z', '+00:00'))
             duration_hours = int((expires - created).total_seconds() / 3600)
         
-        # Create keypair from secret key
+        # Create keypair from decrypted secret key
         secret_key_bytes = bytes(secret_key_list)
         keypair = Keypair.from_bytes(secret_key_bytes)
         
-        # Save encrypted delegation
+        # Save encrypted delegation using user's password
         delegate = get_delegate_wallet()
         delegate.save_delegate(
             keypair=keypair,
@@ -425,19 +463,51 @@ def process_temp_delegation() -> bool:
             duration_hours=duration_hours
         )
         
+        # Cache the password for this session
+        set_session_password(password)
+        
         # Delete temp file
         temp_file.unlink()
         
-        print(f"✅ Delegation activated! Delegate wallet: {str(keypair.pubkey())[:8]}...{str(keypair.pubkey())[-8:]}")
-        print(f"   Max SOL per transaction: {max_sol_per_tx}")
-        print(f"   Max tokens per transaction: {max_token_per_tx}")
-        print(f"   Duration: {duration_hours} hours")
-        print(f"\nUse /delegate to view status anytime.\n")
+        # Check if we're in JSON mode (no tty)
+        import sys
+        if not sys.stdin.isatty():
+            # JSON mode - output as JSON
+            import json
+            notification = {
+                "type": "delegation_activated",
+                "delegate_public_key": str(keypair.pubkey()),
+                "max_sol_per_tx": max_sol_per_tx,
+                "max_token_per_tx": max_token_per_tx,
+                "duration_hours": duration_hours
+            }
+            print(json.dumps(notification), flush=True)
+        else:
+            # Interactive mode - pretty print
+            print(f"✅ Delegation activated! Delegate wallet: {str(keypair.pubkey())[:8]}...{str(keypair.pubkey())[-8:]}")
+            print(f"   Max SOL per transaction: {max_sol_per_tx}")
+            print(f"   Max tokens per transaction: {max_token_per_tx}")
+            print(f"   Duration: {duration_hours} hours")
+            print(f"\nUse /delegate to view status anytime.\n")
         
         return True
     
     except Exception as e:
-        print(f"⚠️  Failed to process delegation: {str(e)}")
+        # Check if we're in JSON mode (no tty)
+        import sys
+        if not sys.stdin.isatty():
+            # JSON mode - output as JSON
+            import json
+            error_msg = {
+                "type": "delegation_error",
+                "error": str(e)
+            }
+            print(json.dumps(error_msg), flush=True)
+        else:
+            # Interactive mode - pretty print
+            print(f"⚠️  Failed to process delegation: {str(e)}")
+            import traceback
+            traceback.print_exc()
         # Don't delete temp file if processing failed
         return False
 

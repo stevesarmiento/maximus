@@ -68,11 +68,23 @@ impl PythonAgent {
 
         println!("Starting Python agent with: {} {:?}", python_cmd, args);
 
-        let child = Command::new(python_cmd)
+        // Build command with environment variables
+        let mut command = Command::new(python_cmd);
+        command
             .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+        
+        // Pass DELEGATION_ENCRYPTION_KEY if it exists in the environment
+        if let Ok(key) = std::env::var("DELEGATION_ENCRYPTION_KEY") {
+            command.env("DELEGATION_ENCRYPTION_KEY", key);
+            println!("Passing DELEGATION_ENCRYPTION_KEY to Python agent");
+        } else {
+            println!("Warning: DELEGATION_ENCRYPTION_KEY not found in environment");
+        }
+        
+        let child = command
             .spawn()
             .context("Failed to spawn Python agent process")?;
 
@@ -147,6 +159,22 @@ impl PythonAgent {
                                     "ready" => {
                                         println!("Agent ready"); // Debug
                                         // Agent is ready, continue reading
+                                        continue;
+                                    }
+                                    "delegation_activated" => {
+                                        // Delegation was activated from temp file
+                                        if let Some(ref app) = app_handle {
+                                            let _ = app.emit_to("main", "delegation-activated", &json_response);
+                                        }
+                                        println!("Delegation activated"); // Debug
+                                        continue;
+                                    }
+                                    "delegation_error" => {
+                                        // Error processing delegation
+                                        if let Some(ref app) = app_handle {
+                                            let _ = app.emit_to("main", "delegation-error", &json_response);
+                                        }
+                                        println!("Delegation error: {:?}", json_response.get("error")); // Debug
                                         continue;
                                     }
                                     _ => {

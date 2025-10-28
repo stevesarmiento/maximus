@@ -247,8 +247,8 @@ def execute_transactions_command(limit: int = 10) -> str:
 def execute_delegate_command() -> str:
     """Execute the /delegate command to show delegation status."""
     from maximus.utils.delegate_wallet import get_delegate_wallet, get_session_password, set_session_password
-    from maximus.utils.password_input import get_password
     from maximus.utils.ui import Colors
+    import sys
     
     try:
         delegate = get_delegate_wallet()
@@ -259,11 +259,17 @@ def execute_delegate_command() -> str:
         # Try to get cached password first
         password = get_session_password()
         
-        # If no cached password, ask for it
+        # If no cached password, check if we're in interactive mode
         if not password:
-            password = get_password("Enter delegation password: ")
-            # Cache it for the session
-            set_session_password(password)
+            # Check if stdin is a terminal (interactive mode)
+            if sys.stdin.isatty():
+                from maximus.utils.password_input import get_password
+                password = get_password("Enter delegation password: ")
+                # Cache it for the session
+                set_session_password(password)
+            else:
+                # In JSON/non-interactive mode without cached password
+                return f"{Colors.YELLOW}Delegation exists but password not cached.{Colors.ENDC}\nPlease restart the app to re-activate delegation."
         
         # Get delegation info
         config = delegate.get_delegation_info(password)
@@ -305,12 +311,51 @@ def execute_delegate_command() -> str:
 
 def execute_export_delegate_command() -> str:
     """Execute the /export-delegate command to show delegate private key."""
-    from maximus.utils.delegate_wallet import get_delegate_wallet
+    from maximus.utils.delegate_wallet import get_delegate_wallet, get_session_password
     from maximus.utils.ui import Colors
+    import sys
     
-    # This command needs interactive prompts, so we return a special marker
-    # that the main loop will handle
-    return "EXPORT_DELEGATE_INTERACTIVE"
+    try:
+        delegate = get_delegate_wallet()
+        
+        if not delegate.delegation_exists():
+            return f"\n{Colors.YELLOW}No delegation found to export.{Colors.ENDC}\n"
+        
+        # Try to get cached password
+        password = get_session_password()
+        
+        # If no cached password, check if we're in interactive mode
+        if not password:
+            if sys.stdin.isatty():
+                # Interactive mode - return special marker for interactive handler
+                return "EXPORT_DELEGATE_INTERACTIVE"
+            else:
+                # In JSON/non-interactive mode without cached password
+                return f"{Colors.YELLOW}Delegation password required.{Colors.ENDC}\nPlease unlock delegation first with /delegate command."
+        
+        # Export keypair with cached password
+        export_data = delegate.export_keypair(password)
+        
+        # Format output
+        output_lines = []
+        output_lines.append(f"\n{Colors.BOLD}{Colors.RED}═══ PRIVATE KEY - KEEP SECRET ═══{Colors.ENDC}\n")
+        output_lines.append(f"{Colors.BOLD}Public Key:{Colors.ENDC}")
+        output_lines.append(f"  {export_data['public_key']}")
+        output_lines.append(f"\n{Colors.BOLD}Secret Key (Base58 - for Phantom/Solflare):{Colors.ENDC}")
+        output_lines.append(f"  {export_data['secret_key_base58']}")
+        output_lines.append(f"\n{Colors.YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Colors.ENDC}")
+        output_lines.append(f"{Colors.YELLOW}How to import into Phantom:{Colors.ENDC}")
+        output_lines.append(f"  1. Open Phantom wallet")
+        output_lines.append(f"  2. Settings → Add/Connect Wallet → Import Private Key")
+        output_lines.append(f"  3. Paste the Base58 key above")
+        output_lines.append(f"{Colors.YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Colors.ENDC}")
+        output_lines.append(f"\n{Colors.GREEN}✓{Colors.ENDC} Save this in a secure password manager!")
+        output_lines.append(f"{Colors.DIM}Anyone with this key can control the delegate wallet.{Colors.ENDC}\n")
+        
+        return "\n".join(output_lines)
+    
+    except Exception as e:
+        return f"{Colors.RED}Error exporting delegate:{Colors.ENDC} {str(e)}"
 
 
 def execute_import_delegate_command() -> str:
@@ -747,6 +792,10 @@ def run_json_mode():
     
     session_id = str(uuid.uuid4())
     
+    # Check for pending delegation from web dashboard
+    from maximus.utils.delegate_wallet import process_temp_delegation
+    process_temp_delegation()
+    
     # Redirect agent's status bar to JSON output
     from maximus.utils import status_bar as sb_module
     json_status_bar = JSONStatusBar()
@@ -797,6 +846,25 @@ def run_json_mode():
             elif query == "/delegate":
                 result = execute_delegate_command()
                 response = {"type": "command_result", "command": "delegate", "result": result}
+            elif query == "/export-delegate":
+                result = execute_export_delegate_command()
+                response = {"type": "command_result", "command": "export_delegate", "result": result}
+            elif query.startswith("/set-delegation-password "):
+                # Extract password from command
+                password = query.replace("/set-delegation-password ", "").strip()
+                from maximus.utils.delegate_wallet import set_session_password, get_delegate_wallet
+                
+                # Verify password is valid by trying to decrypt delegation
+                delegate = get_delegate_wallet()
+                if delegate.delegation_exists():
+                    config = delegate.get_delegation_info(password)
+                    if config:
+                        set_session_password(password)
+                        response = {"type": "command_result", "command": "set_delegation_password", "result": "✅ Delegation password set successfully"}
+                    else:
+                        response = {"type": "error", "error": "Invalid password"}
+                else:
+                    response = {"type": "error", "error": "No delegation found"}
             else:
                 # Regular query - run through agent
                 try:

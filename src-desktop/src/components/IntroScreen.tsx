@@ -42,12 +42,12 @@ export function IntroScreen() {
 
   return (
     <div style={{
-      padding: '40px 20px',
-      fontFamily: 'Geist Mono, JetBrains Mono, monospace',
-      fontSize: '0.9em',
+      padding: 'calc(var(--spacing-xl) * 2) var(--spacing-lg)',
+      fontFamily: 'var(--font-family-mono)',
+      fontSize: 'var(--font-size-small)',
     }}>
       {/* Logo and Title - horizontal layout */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
         {/* SVG Logo - smaller */}
         <svg
           width="60"

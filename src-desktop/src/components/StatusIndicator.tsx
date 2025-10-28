@@ -25,29 +25,6 @@ export function StatusIndicator({ phase, message, details }: StatusIndicatorProp
     }
   }, [phase]);
 
-  const getPhaseColor = () => {
-    switch (phase) {
-      case 'planning':
-        return 'var(--accent-orange)';
-      case 'thinking':
-        return 'var(--accent-blue)';
-      case 'executing':
-        return 'var(--accent-yellow)';
-      case 'optimizing':
-        return '#ff00ff'; // Magenta
-      case 'validating':
-        return 'var(--accent-blue)';
-      case 'generating':
-        return 'var(--accent-orange)';
-      case 'complete':
-        return 'var(--accent-green)';
-      case 'error':
-        return 'var(--accent-red)';
-      default:
-        return 'var(--text-muted)';
-    }
-  };
-
   const getSymbol = () => {
     if (phase === 'complete') return '✓';
     if (phase === 'error') return '✗';
@@ -58,18 +35,10 @@ export function StatusIndicator({ phase, message, details }: StatusIndicatorProp
   if (phase === 'idle') return null;
 
   return (
-    <div style={{
-      padding: '4px 0',
-      color: getPhaseColor(),
-      fontFamily: 'JetBrains Mono, monospace',
-      fontSize: '0.9em',
-      display: 'flex',
-      gap: '8px',
-      alignItems: 'center',
-    }}>
-      <span>{getSymbol()}</span>
-      <span>{message}</span>
-      {details && <span style={{ color: 'var(--text-muted)' }}>{details}</span>}
+    <div className="status-indicator" data-phase={phase}>
+      <span className="status-indicator-symbol">{getSymbol()}</span>
+      <span className="status-indicator-message">{message}</span>
+      {details && <span className="status-indicator-details">{details}</span>}
     </div>
   );
 }
