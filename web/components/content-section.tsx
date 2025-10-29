@@ -14,7 +14,7 @@ export function ContentSection({ children }: ContentSectionProps) {
       {/* Background Image */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <Image
-          src="https://uksgfm3uq5.ufs.sh/f/cflVQmqOSasDQKRSu6Uj5dYon0IGBlOwMNzyrah2b8fkucJT"
+          src="https://uksgfm3uq5.ufs.sh/f/cflVQmqOSasDH3WhWklGuwJKRyhcQ7TrLvbWPaOqoBSdgH06"
           alt="Background pattern"
           fill
           className="object-cover"
