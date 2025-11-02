@@ -35,6 +35,8 @@ export function Terminal() {
     getWalletBalances,
     getTransactions,
     setDelegationPassword,
+    acceptSwapQuote,
+    rejectSwapQuote,
   } = useAgent();
 
   useEffect(() => {
@@ -172,7 +174,12 @@ export function Terminal() {
           <IntroScreen />
         ) : (
           <div className="terminal-content-inner">
-            <MessageList messages={messages} isLoading={isLoading} />
+            <MessageList 
+              messages={messages} 
+              isLoading={isLoading}
+              onAcceptSwap={acceptSwapQuote}
+              onRejectSwap={rejectSwapQuote}
+            />
             {(isLoading || (currentStatus && currentStatus.phase !== 'idle' && currentStatus.phase !== 'complete')) && (
               <div className="terminal-status-container">
                 <StatusIndicator 

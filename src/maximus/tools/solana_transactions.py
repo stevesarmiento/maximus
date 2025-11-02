@@ -354,6 +354,196 @@ def send_token(token_mint: str, to_address: str, amount: float) -> dict:
         }
 
 
+async def execute_swap_with_quote(
+    provider_id: str,
+    best_quote,
+    from_token: str,
+    to_token: str,
+    amount: float,
+    keypair
+) -> dict:
+    """Execute a swap using a pre-fetched quote."""
+    from maximus.tools.solana_client import get_solana_client
+    from solana.rpc.commitment import Confirmed
+    
+    # Get output token info for proper decimal formatting
+    _, output_decimals, _ = resolve_token_info(to_token)
+    out_amount = best_quote.out_amount / (10 ** output_decimals)
+    
+    try:
+        # Get Solana client
+        client = get_solana_client()
+        
+        # Check if we have a pre-built transaction
+        if best_quote.transaction:
+            # Deserialize the transaction provided by Titan
+            from solders.transaction import VersionedTransaction
+            tx = VersionedTransaction.from_bytes(best_quote.transaction)
+            
+            # Sign with delegate wallet
+            tx.sign([keypair])
+            
+            # Send the transaction
+            from solana.rpc.types import TxOpts
+            opts = TxOpts(
+                skip_preflight=False,
+                preflight_commitment=Confirmed,
+                max_retries=3
+            )
+            
+            signature = client.client.send_raw_transaction(
+                bytes(tx),
+                opts=opts
+            ).value
+            
+            # Wait for confirmation
+            confirmation = client.client.confirm_transaction(
+                signature,
+                commitment=Confirmed
+            )
+            
+            if confirmation.value:
+                return {
+                    "success": True,
+                    "signature": str(signature),
+                    "provider": provider_id,
+                    "in_amount": amount,
+                    "out_amount": out_amount,
+                    "from_token": from_token,
+                    "to_token": to_token,
+                    "message": f"✅ Swap executed successfully!\n\n"
+                              f"Swapped: {amount} {from_token} → {out_amount:.6f} {to_token}\n"
+                              f"Provider: {provider_id}\n"
+                              f"Transaction: {str(signature)}\n\n"
+                              f"View on Solscan: https://solscan.io/tx/{str(signature)}"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Transaction failed to confirm"
+                }
+        elif best_quote.instructions:
+            # Build transaction from instructions if no pre-built transaction
+            from solders.instruction import Instruction as SoldersInstruction
+            from solders.message import MessageV0
+            from solders.transaction import VersionedTransaction
+            from solders.pubkey import Pubkey
+            
+            # Convert Titan instructions to Solders instructions
+            instructions = []
+            for titan_ix in best_quote.instructions:
+                # Titan format: {p: Pubkey, a: [AccountMeta], d: bytes}
+                program_id = Pubkey(titan_ix['p'])
+                accounts = []
+                for acc in titan_ix['a']:
+                    from solders.instruction import AccountMeta
+                    accounts.append(AccountMeta(
+                        pubkey=Pubkey(acc['p']),
+                        is_signer=acc['s'],
+                        is_writable=acc['w']
+                    ))
+                data = bytes(titan_ix['d'])
+                instructions.append(SoldersInstruction(program_id, data, accounts))
+            
+            # Get recent blockhash
+            recent_blockhash_resp = client.client.get_latest_blockhash(Confirmed)
+            recent_blockhash = recent_blockhash_resp.value.blockhash
+            
+            # Load address lookup tables if any
+            lookup_accounts = []
+            if best_quote.address_lookup_tables:
+                from solders.address_lookup_table_account import AddressLookupTableAccount
+                
+                for table_address in best_quote.address_lookup_tables:
+                    try:
+                        table_pubkey = Pubkey(table_address)
+                        account_info = client.client.get_account_info(table_pubkey)
+                        
+                        if account_info.value and account_info.value.data:
+                            data = bytes(account_info.value.data)
+                            addresses = []
+                            offset = 56  # Skip ALT metadata
+                            
+                            while offset + 32 <= len(data):
+                                addr_bytes = data[offset:offset + 32]
+                                addresses.append(Pubkey(addr_bytes))
+                                offset += 32
+                            
+                            if addresses:
+                                alt = AddressLookupTableAccount(
+                                    key=table_pubkey,
+                                    addresses=addresses
+                                )
+                                lookup_accounts.append(alt)
+                    except Exception:
+                        pass
+            
+            # Create message (V0 for address lookup table support)
+            message = MessageV0.try_compile(
+                payer=keypair.pubkey(),
+                instructions=instructions,
+                address_lookup_table_accounts=lookup_accounts,
+                recent_blockhash=recent_blockhash,
+            )
+            
+            # Create and sign transaction
+            tx = VersionedTransaction(message, [keypair])
+            
+            # Send the transaction
+            from solana.rpc.types import TxOpts
+            opts = TxOpts(
+                skip_preflight=False,
+                preflight_commitment=Confirmed,
+                max_retries=3
+            )
+            
+            signature = client.client.send_raw_transaction(
+                bytes(tx),
+                opts=opts
+            ).value
+            
+            # Wait for confirmation
+            confirmation = client.client.confirm_transaction(
+                signature,
+                commitment=Confirmed
+            )
+            
+            if confirmation.value:
+                return {
+                    "success": True,
+                    "signature": str(signature),
+                    "provider": provider_id,
+                    "in_amount": amount,
+                    "out_amount": out_amount,
+                    "from_token": from_token,
+                    "to_token": to_token,
+                    "message": f"✅ Swap executed successfully!\n\n"
+                              f"Swapped: {amount} {from_token} → {out_amount:.6f} {to_token}\n"
+                              f"Provider: {provider_id}\n"
+                              f"Transaction: {str(signature)}\n\n"
+                              f"View on Solscan: https://solscan.io/tx/{str(signature)}"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Transaction failed to confirm"
+                }
+        else:
+            return {
+                "success": False,
+                "error": "No transaction data or instructions available from quote. Please try again."
+            }
+    
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        return {
+            "success": False,
+            "error": f"Swap execution failed: {str(e)}",
+            "details": error_detail
+        }
+
+
 @tool(args_schema=SwapTokensInput)
 def swap_tokens(
     from_token: str,
@@ -437,10 +627,24 @@ def swap_tokens(
         )
         
         if not result:
-            return {
-                "success": False,
-                "error": "Swap cancelled or no quotes available"
-            }
+            # In JSON mode (Tauri), this means quotes were sent and awaiting user confirmation
+            # In interactive mode, this means user cancelled
+            import sys
+            if not sys.stdin.isatty():
+                # JSON mode - quotes sent via stream
+                # Return minimal response - quotes are displayed via swap_quote_update stream
+                # The agent should not generate additional text since quotes are already showing
+                return {
+                    "success": True,
+                    "pending": True,
+                    "message": "Swap quotes are being streamed. Please review the live quotes displayed above."
+                }
+            else:
+                # Interactive mode - user cancelled
+                return {
+                    "success": False,
+                    "error": "Swap cancelled or no quotes available"
+                }
         
         provider_id, best_quote, all_quotes = result
         
@@ -821,6 +1025,7 @@ async def get_titan_swap_with_display(
         stream_quotes_with_display,
         QuoteDisplayConfig
     )
+    import sys
     
     # Resolve token symbols to mint addresses and get decimals
     input_mint, input_decimals, input_symbol = resolve_token_info(from_token)
@@ -840,6 +1045,10 @@ async def get_titan_swap_with_display(
     # Create Titan client
     client = TitanClient()
     
+    # In JSON mode, don't close the client immediately - let the stream handle it
+    # The stream will close the client when it's done
+    is_json_mode = not sys.stdin.isatty()
+    
     try:
         await client.connect()
         
@@ -852,11 +1061,20 @@ async def get_titan_swap_with_display(
             user_public_key=user_public_key,
             slippage_bps=slippage_bps,
             config=config,
+            from_token=from_token,
+            to_token=to_token,
+            amount_float=amount,
         )
         
         return result
     
     finally:
-        await client.close()
+        # Only close client if not in JSON mode (where stream manages it)
+        # or if we got a result (stream already closed)
+        if not is_json_mode or result is not None:
+            try:
+                await client.close()
+            except:
+                pass
 
 

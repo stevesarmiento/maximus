@@ -845,21 +845,45 @@ def run_json_mode():
                 print(json.dumps(response), flush=True)
                 break
             elif query == "/balances":
+                # Stop any swap streams first - aggressive cleanup
+                from maximus.tools.titan_display import clear_all_swaps
+                clear_all_swaps()
+                import time
+                time.sleep(0.3)  # Give streams more time to exit
+                
                 result = execute_balances_command()
                 # Strip ANSI codes for clean JSON output
                 clean_result = strip_ansi_codes(result)
                 response = {"type": "command_result", "command": "balances", "result": clean_result}
             elif query == "/transactions":
+                # Stop any swap streams first
+                from maximus.tools.titan_display import clear_all_swaps
+                clear_all_swaps()
+                import time
+                time.sleep(0.3)
+                
                 result = execute_transactions_command()
                 # Strip ANSI codes for clean JSON output
                 clean_result = strip_ansi_codes(result)
                 response = {"type": "command_result", "command": "transactions", "result": clean_result}
             elif query == "/delegate":
+                # Stop any swap streams first
+                from maximus.tools.titan_display import clear_all_swaps
+                clear_all_swaps()
+                import time
+                time.sleep(0.3)
+                
                 result = execute_delegate_command()
                 # Strip ANSI codes for clean JSON output
                 clean_result = strip_ansi_codes(result)
                 response = {"type": "command_result", "command": "delegate", "result": clean_result}
             elif query == "/export-delegate":
+                # Stop any swap streams first
+                from maximus.tools.titan_display import clear_all_swaps
+                clear_all_swaps()
+                import time
+                time.sleep(0.3)
+                
                 result = execute_export_delegate_command()
                 # Strip ANSI codes for clean JSON output
                 clean_result = strip_ansi_codes(result)
@@ -880,11 +904,162 @@ def run_json_mode():
                         response = {"type": "error", "error": "Invalid password"}
                 else:
                     response = {"type": "error", "error": "No delegation found"}
+            elif query.startswith("/accept-swap-quote "):
+                # Accept a pending swap quote
+                session_id = query.replace("/accept-swap-quote ", "").strip()
+                from maximus.tools.titan_display import get_pending_swap, stop_swap_stream, SessionState, set_session_state
+                from maximus.tools.solana_transactions import execute_swap_with_quote
+                from maximus.utils.delegate_wallet import get_delegate_wallet, get_session_password
+                import asyncio
+                import traceback
+                
+                try:
+                    # Set state to ACCEPTING immediately to suppress any quote outputs
+                    set_session_state(session_id, SessionState.ACCEPTING)
+                    
+                    swap_data = get_pending_swap(session_id)
+                    if not swap_data:
+                        response = {"type": "error", "error": "Swap session not found or expired"}
+                    else:
+                        # Unpack the tuple (provider_id, best_quote, all_quotes, from_token, to_token, amount)
+                        provider_id, best_quote, all_quotes, from_token, to_token, amount_float = swap_data
+                        
+                        # Stop the stream immediately (async)
+                        try:
+                            asyncio.run(stop_swap_stream(session_id))
+                        except Exception as stream_err:
+                            print(json.dumps({"type": "debug", "message": f"Error stopping stream: {stream_err}"}), flush=True)
+                        
+                        # Wait for stream to actually stop
+                        import time
+                        time.sleep(0.5)
+                        
+                        # Get delegate keypair
+                        delegate = get_delegate_wallet()
+                        password = get_session_password()
+                        if not password:
+                            response = {"type": "error", "error": "Delegation password not cached. Please unlock delegation first."}
+                        else:
+                            keypair = delegate.load_delegate(password)
+                            
+                            # Execute the swap
+                            result = asyncio.run(execute_swap_with_quote(
+                                provider_id=provider_id,
+                                best_quote=best_quote,
+                                from_token=from_token,
+                                to_token=to_token,
+                                amount=amount_float,
+                                keypair=keypair
+                            ))
+                            
+                            if result and result.get('success'):
+                                clean_result = strip_ansi_codes(result.get('message', 'Swap executed'))
+                                response = {"type": "command_result", "command": "accept_swap", "result": clean_result}
+                            else:
+                                error_msg = result.get('error', 'Unknown error') if result else 'No result returned'
+                                response = {"type": "error", "error": error_msg}
+                            
+                            # Set state to COMPLETED after execution (success or failure)
+                            set_session_state(session_id, SessionState.COMPLETED)
+                except Exception as e:
+                    error_detail = traceback.format_exc()
+                    print(json.dumps({"type": "debug", "message": f"Accept swap error: {error_detail}"}), flush=True)
+                    response = {"type": "error", "error": f"Swap execution failed: {str(e)}"}
+                
+                # Print response immediately for accept command
+                print(json.dumps(response), flush=True)
+                continue  # Skip agent processing
+            elif query.startswith("/reject-swap-quote "):
+                # Reject a pending swap quote
+                session_id = query.replace("/reject-swap-quote ", "").strip()
+                from maximus.tools.titan_display import get_pending_swap, stop_swap_stream, SessionState, set_session_state
+                import asyncio
+                
+                # Set state to REJECTING immediately to suppress any quote outputs
+                set_session_state(session_id, SessionState.REJECTING)
+                
+                swap_data = get_pending_swap(session_id)
+                if swap_data:
+                    # Stop the stream immediately (async)
+                    try:
+                        asyncio.run(stop_swap_stream(session_id))
+                    except:
+                        pass
+                    
+                    # Wait for stream to actually stop
+                    import time
+                    time.sleep(0.5)
+                    
+                    # Set state to CANCELLED after rejection
+                    set_session_state(session_id, SessionState.CANCELLED)
+                    
+                    response = {"type": "command_result", "command": "reject_swap", "result": "Swap cancelled"}
+                else:
+                    # Still return success even if session not found
+                    set_session_state(session_id, SessionState.CANCELLED)
+                    response = {"type": "command_result", "command": "reject_swap", "result": "Swap cancelled"}
+                
+                # Print response immediately for reject command
+                print(json.dumps(response), flush=True)
+                continue  # Skip agent processing
             else:
+                # Stop any active swap streams before processing new query
+                from maximus.tools.titan_display import clear_all_swaps
+                import asyncio
+                
+                # Aggressively clear all swaps
+                clear_all_swaps()
+                
+                # Also stop any streams asynchronously
+                try:
+                    # Try to stop any active streams
+                    from maximus.tools.titan_display import _active_streams, stop_swap_stream
+                    for sid in list(_active_streams.keys()):
+                        try:
+                            asyncio.run(stop_swap_stream(sid))
+                        except:
+                            pass
+                except:
+                    pass
+                
+                # Wait longer to ensure streams have fully stopped
+                import time
+                time.sleep(0.5)  # Increased wait time for reliable cleanup
+                
+                # Check if this is a swap query BEFORE running agent
+                # If it is, we'll suppress the answer since quotes are displayed via swap_quote_update stream
+                is_swap_query = any(keyword in query.lower() for keyword in ['swap', 'exchange', 'trade'])
+                
+                # Check if swap was cancelled/accepted before we process the response
+                # This prevents stale agent responses after cancel/accept
+                from maximus.tools.titan_display import _session_states, SessionState
+                swap_was_handled = False
+                if is_swap_query:
+                    # Check if any swap sessions were recently cancelled or completed
+                    for sid, state in _session_states.items():
+                        if state in (SessionState.CANCELLED, SessionState.COMPLETED):
+                            swap_was_handled = True
+                            break
+                
                 # Regular query - run through agent
                 try:
                     answer = agent.run(query)
-                    response = {"type": "answer", "query": query, "answer": answer}
+                    
+                    # Small delay to allow async streams to start (like swap quotes)
+                    import time
+                    time.sleep(0.3)  # Increased delay to ensure stream has started
+                    
+                    # Check if a swap is pending (quotes streaming)
+                    from maximus.tools.titan_display import _active_streams, _pending_swaps
+                    has_active_swap = bool(_active_streams) or bool(_pending_swaps)
+                    
+                    # If swap was cancelled/accepted, suppress the answer (user already handled it)
+                    # OR if it's a swap query, always suppress the answer (quotes shown via card)
+                    # OR if we detect active swaps, suppress the answer
+                    if swap_was_handled or is_swap_query or has_active_swap:
+                        response = {"type": "answer", "query": query, "answer": ""}
+                    else:
+                        response = {"type": "answer", "query": query, "answer": answer}
                 except Exception as e:
                     response = {"type": "error", "query": query, "error": str(e)}
             

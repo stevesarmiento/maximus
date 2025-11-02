@@ -98,6 +98,9 @@ impl PythonAgent {
         let mut process_lock = self.process.lock().unwrap();
 
         if let Some(ref mut child) = *process_lock {
+            // Check if this is an accept/reject command - we should ignore stale quote updates
+            let is_swap_command = query.starts_with("/accept-swap-quote") || query.starts_with("/reject-swap-quote");
+            
             // Send query via stdin
             if let Some(ref mut stdin) = child.stdin {
                 writeln!(stdin, "{}", query)
@@ -175,6 +178,24 @@ impl PythonAgent {
                                             let _ = app.emit_to("main", "delegation-error", &json_response);
                                         }
                                         println!("Delegation error: {:?}", json_response.get("error")); // Debug
+                                        continue;
+                                    }
+                                    "swap_quote" | "swap_quote_update" => {
+                                        // If this is an accept/reject command, ignore stale quote updates
+                                        // They can arrive mid-flight but we want the actual command result
+                                        if is_swap_command {
+                                            println!("Ignoring stale swap quote update during accept/reject command");
+                                            continue;
+                                        }
+                                        
+                                        // Swap quote received or updated - send directly to frontend
+                                        // Format as a special message that will be parsed as swap_quote type
+                                        println!("Swap quote update received: {:?}", json_response.get("session_id"));
+                                        return Ok(serde_json::to_string(&json_response).unwrap_or_default());
+                                    }
+                                    "debug" => {
+                                        // Debug messages - log and continue
+                                        println!("Debug: {:?}", json_response.get("message"));
                                         continue;
                                     }
                                     _ => {

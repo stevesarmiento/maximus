@@ -290,6 +290,15 @@ class Agent:
     @with_generating("Generating answer...", "Answer ready")
     def _generate_answer(self, query: str, session_outputs: list, memories: List[str] = None, partial: bool = False) -> str:
         """Generate the final answer based on collected data and conversation history."""
+        # Check if any tool output indicates a pending swap (quotes streaming)
+        # If so, return empty answer - quotes are displayed via stream
+        import sys
+        if not sys.stdin.isatty():  # JSON mode
+            for output in session_outputs:
+                if isinstance(output, str) and ('"pending": True' in output or '"pending":True' in output):
+                    # Swap quotes are streaming - don't generate text answer
+                    return ""
+        
         all_results = "\n\n".join(session_outputs) if session_outputs else "No data was collected."
         
         # Include memory context if available

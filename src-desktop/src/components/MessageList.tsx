@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { AgentMessage } from '../hooks/useAgent';
+import { SwapQuoteCard } from './SwapQuoteCard';
 
 interface MessageListProps {
   messages: AgentMessage[];
   isLoading: boolean;
+  onAcceptSwap?: (sessionId: string) => void;
+  onRejectSwap?: (sessionId: string) => void;
 }
 
-export function MessageList({ messages, isLoading }: MessageListProps) {
+export function MessageList({ messages, isLoading, onAcceptSwap, onRejectSwap }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,6 +33,21 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
   };
 
   const renderMessage = (message: AgentMessage) => {
+    // Swap quote card
+    if (message.type === 'swap_quote' && message.swapQuote) {
+      return (
+        <div key={message.id} style={{ padding: '12px 0' }}>
+          <SwapQuoteCard
+            quotes={message.swapQuote.quotes}
+            symbolIn={message.swapQuote.symbolIn}
+            symbolOut={message.swapQuote.symbolOut}
+            onAccept={() => onAcceptSwap?.(message.swapQuote!.sessionId || '')}
+            onReject={() => onRejectSwap?.(message.swapQuote!.sessionId || '')}
+          />
+        </div>
+      );
+    }
+
     // User query - show with >> prefix
     if (message.type === 'user') {
       return (
