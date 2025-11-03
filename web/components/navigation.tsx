@@ -50,6 +50,7 @@ const Navigation = React.memo(() => {
     <>
       <nav className="sticky top-0 z-[200]">
         <div className="max-w-5xl mx-auto border-r border-l border-b border-sand-1400 bg-bg1 backdrop-blur-md">
+          
           <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between h-16">
             {/* Logo */}

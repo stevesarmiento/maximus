@@ -1,120 +1,15 @@
 import Link from 'next/link';
 import { memo } from 'react';
 import { FooterLogo } from '@/components/footer-logo';
+import { AnimatedLine } from './animated-line';
 
 const Footer = memo(() => {
   return (
-    <footer className="py-24 mt-[140px] h-full">
-      <div className="relative">
-        {/* Horizontal Lines SVG - Top */}
-        <svg 
-          className="absolute inset-0 pointer-events-none z-0"
-          style={{
-            left: '50%',
-            top: '-64px',
-            transform: 'translate(-50%, -50%)',
-            width: '150vw',
-          }}
-        >
-          <defs>
-            <linearGradient id="footerHorizontalPulse1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="transparent" />
-              <stop offset="50%" stopColor="rgba(246, 245, 243, 0.8)" />
-              <stop offset="100%" stopColor="transparent" />
-            </linearGradient>
-          </defs>
-          
-          {/* Horizontal line - left to right across full screen */}
-          <line 
-            x1="0" 
-            y1="50%" 
-            x2="100%" 
-            y2="50%" 
-            stroke="rgba(57, 54, 53, 1)" 
-            strokeWidth="1"
-          />
-          
-          {/* Horizontal pulse elements */}
-          <rect 
-            x="0" 
-            y="50%" 
-            width="2%" 
-            height="1" 
-            fill="url(#footerHorizontalPulse1)"
-            transform="translate(0, -0.5)"
-          >
-            <animate
-              attributeName="x"
-              values="0; 100%; 100%"
-              dur="6s"
-              begin="0.5s"
-              repeatCount="indefinite"
-            />
-            <animate
-              attributeName="opacity"
-              values="0; 0.8; 0.8; 0"
-              dur="6s"
-              begin="0.5s"
-              repeatCount="indefinite"
-            />
-          </rect>
-        </svg>
+    <footer className="h-[520px]">
+      <div className="relative h-full">
+        <AnimatedLine id="footerHorizontalPulse" animationDelay="6.5s" />
 
-        {/* Horizontal Lines SVG - Bottom */}
-        <svg 
-          className="absolute inset-0 pointer-events-none z-0"
-          style={{
-            left: '50%',
-            top: '0%',
-            transform: 'translate(-50%, -50%)',
-            width: '150vw',
-          }}
-        >
-          <defs>
-            <linearGradient id="footerHorizontalPulse2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="transparent" />
-              <stop offset="50%" stopColor="rgba(246, 245, 243, 0.8)" />
-              <stop offset="100%" stopColor="transparent" />
-            </linearGradient>
-          </defs>
-          
-          {/* Horizontal line - left to right across full screen */}
-          <line 
-            x1="0" 
-            y1="50%" 
-            x2="100%" 
-            y2="50%" 
-            stroke="rgba(57, 54, 53, 1)" 
-            strokeWidth="1"
-          />
-          
-          {/* Horizontal pulse elements */}
-          <rect 
-            x="0" 
-            y="50%" 
-            width="2%" 
-            height="1" 
-            fill="url(#footerHorizontalPulse2)"
-            transform="translate(0, -0.5)"
-          >
-            <animate
-              attributeName="x"
-              values="0; 100%; 100%"
-              dur="6s"
-              begin="0.5s"
-              repeatCount="indefinite"
-            />
-            <animate
-              attributeName="opacity"
-              values="0; 0.8; 0.8; 0"
-              dur="6s"
-              begin="0.5s"
-              repeatCount="indefinite"
-            />
-          </rect>
-        </svg>
-
-        <div className="max-w-6xl mx-auto p-12 py-6">
+        <div className="max-w-5xl mx-auto p-10 border-l border-r border-sand-1400 h-full">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-12">
             <div className="mb-8 md:mb-0">
               <p className="text-sm text-sand-1200 mb-2 font-berkeley-mono">Developed by:</p>

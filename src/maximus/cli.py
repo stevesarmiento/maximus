@@ -1,8 +1,12 @@
 import uuid
 import os
+import sys
 import shutil
 import threading
 import logging
+import json
+import argparse
+import re
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -37,6 +41,12 @@ from prompt_toolkit.formatted_text import FormattedText
 def get_terminal_width():
     """Get current terminal width."""
     return shutil.get_terminal_size().columns
+
+
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI color codes from text for clean output."""
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    return ansi_escape.sub('', text)
 
 
 class AppState:
@@ -244,29 +254,35 @@ def execute_transactions_command(limit: int = 10) -> str:
 def execute_delegate_command() -> str:
     """Execute the /delegate command to show delegation status."""
     from maximus.utils.delegate_wallet import get_delegate_wallet, get_session_password, set_session_password
-    from maximus.utils.password_input import get_password
     from maximus.utils.ui import Colors
+    import sys
     
     try:
         delegate = get_delegate_wallet()
         
         if not delegate.delegation_exists():
-            return f"\n{Colors.YELLOW}No delegation found.{Colors.ENDC}\n\nTo create a delegation:\n1. Visit the web dashboard at http://localhost:3000/delegate\n2. Connect your wallet and set delegation limits\n3. A delegate wallet will be created automatically\n"
+            return f"{Colors.YELLOW}No delegation found.{Colors.ENDC}\nTo create a delegation:\n1. Visit the web dashboard at http://localhost:3000/delegate\n2. Connect your wallet and set delegation limits\n3. A delegate wallet will be created automatically"
         
         # Try to get cached password first
         password = get_session_password()
         
-        # If no cached password, ask for it
+        # If no cached password, check if we're in interactive mode
         if not password:
-            password = get_password("Enter delegation password: ")
-            # Cache it for the session
-            set_session_password(password)
+            # Check if stdin is a terminal (interactive mode)
+            if sys.stdin.isatty():
+                from maximus.utils.password_input import get_password
+                password = get_password("Enter delegation password: ")
+                # Cache it for the session
+                set_session_password(password)
+            else:
+                # In JSON/non-interactive mode without cached password
+                return f"{Colors.YELLOW}Delegation exists but password not cached.{Colors.ENDC}\nPlease restart the app to re-activate delegation."
         
         # Get delegation info
         config = delegate.get_delegation_info(password)
         
         if not config:
-            return f"{Colors.RED}Failed to load delegation.{Colors.ENDC} Invalid password or corrupted file."
+            return f"{Colors.RED}Failed to load delegation.{Colors.ENDC}\nInvalid password or corrupted file."
         
         # Check if expired
         from datetime import datetime, timezone
@@ -297,17 +313,56 @@ def execute_delegate_command() -> str:
         return "\n".join(output_lines)
     
     except Exception as e:
-        return f"{Colors.RED}Error checking delegation:{Colors.ENDC} {str(e)}"
+        return f"{Colors.RED}Error checking delegation.{Colors.ENDC}\n{str(e)}"
 
 
 def execute_export_delegate_command() -> str:
     """Execute the /export-delegate command to show delegate private key."""
-    from maximus.utils.delegate_wallet import get_delegate_wallet
+    from maximus.utils.delegate_wallet import get_delegate_wallet, get_session_password
     from maximus.utils.ui import Colors
+    import sys
     
-    # This command needs interactive prompts, so we return a special marker
-    # that the main loop will handle
-    return "EXPORT_DELEGATE_INTERACTIVE"
+    try:
+        delegate = get_delegate_wallet()
+        
+        if not delegate.delegation_exists():
+            return f"{Colors.YELLOW}No delegation found to export.{Colors.ENDC}\nCreate a delegation first using the web dashboard at http://localhost:3000/delegate"
+        
+        # Try to get cached password
+        password = get_session_password()
+        
+        # If no cached password, check if we're in interactive mode
+        if not password:
+            if sys.stdin.isatty():
+                # Interactive mode - return special marker for interactive handler
+                return "EXPORT_DELEGATE_INTERACTIVE"
+            else:
+                # In JSON/non-interactive mode without cached password
+                return f"{Colors.YELLOW}Delegation password required.{Colors.ENDC}\nPlease unlock delegation first with the /delegate command."
+        
+        # Export keypair with cached password
+        export_data = delegate.export_keypair(password)
+        
+        # Format output
+        output_lines = []
+        output_lines.append(f"\n{Colors.BOLD}{Colors.RED}═══ PRIVATE KEY - KEEP SECRET ═══{Colors.ENDC}\n")
+        output_lines.append(f"{Colors.BOLD}Public Key:{Colors.ENDC}")
+        output_lines.append(f"  {export_data['public_key']}")
+        output_lines.append(f"\n{Colors.BOLD}Secret Key (Base58 - for Phantom/Solflare):{Colors.ENDC}")
+        output_lines.append(f"  {export_data['secret_key_base58']}")
+        output_lines.append(f"\n{Colors.YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Colors.ENDC}")
+        output_lines.append(f"{Colors.YELLOW}How to import into Phantom:{Colors.ENDC}")
+        output_lines.append(f"  1. Open Phantom wallet")
+        output_lines.append(f"  2. Settings → Add/Connect Wallet → Import Private Key")
+        output_lines.append(f"  3. Paste the Base58 key above")
+        output_lines.append(f"{Colors.YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Colors.ENDC}")
+        output_lines.append(f"\n{Colors.GREEN}✓{Colors.ENDC} Save this in a secure password manager!")
+        output_lines.append(f"{Colors.DIM}Anyone with this key can control the delegate wallet.{Colors.ENDC}\n")
+        
+        return "\n".join(output_lines)
+    
+    except Exception as e:
+        return f"{Colors.RED}Error exporting delegate.{Colors.ENDC}\n{str(e)}"
 
 
 def execute_import_delegate_command() -> str:
@@ -650,7 +705,208 @@ def create_application(state: AppState):
     return app, input_buffer
 
 
+class JSONStatusBar:
+    """Status bar that outputs JSON events for the native app."""
+    
+    def __init__(self):
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+        self.is_animating = False
+        self.animation_thread = None
+        self._frame_idx = 0
+    
+    def start_phase(self, phase, message, details=""):
+        """Emit status update as JSON."""
+        self.current_phase = phase.value if hasattr(phase, 'value') else phase
+        self.current_message = message
+        self.details = details
+        self.is_animating = True
+        
+        status = {
+            "type": "status",
+            "phase": self.current_phase,
+            "message": message,
+            "details": details
+        }
+        print(json.dumps(status), flush=True)
+    
+    def complete_phase(self, final_message="", show_completion=False):
+        """Emit completion status."""
+        self.is_animating = False
+        
+        if show_completion and final_message:
+            status = {
+                "type": "status",
+                "phase": "complete",
+                "message": final_message,
+                "details": ""
+            }
+            print(json.dumps(status), flush=True)
+        
+        # Reset state
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+    
+    def error_phase(self, error_message, show_on_newline=True):
+        """Emit error status."""
+        self.is_animating = False
+        
+        status = {
+            "type": "status",
+            "phase": "error",
+            "message": error_message,
+            "details": ""
+        }
+        print(json.dumps(status), flush=True)
+        
+        # Reset state
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+    
+    def transition_to(self, phase, message, details=""):
+        """Transition to a new phase."""
+        self.start_phase(phase, message, details)
+    
+    def update_details(self, details):
+        """Update details."""
+        self.details = details
+    
+    def clear(self):
+        """Clear status."""
+        self.is_animating = False
+        self.current_phase = "idle"
+        self.current_message = ""
+        self.details = ""
+    
+    def show_static(self, message, symbol="", color=""):
+        """Show static message."""
+        status = {
+            "type": "status",
+            "phase": "info",
+            "message": message,
+            "details": ""
+        }
+        print(json.dumps(status), flush=True)
+
+
+def run_json_mode():
+    """Run agent in JSON mode for programmatic access (e.g., from Tauri app)."""
+    import sys
+    from io import StringIO
+    
+    session_id = str(uuid.uuid4())
+    
+    # Check for pending delegation from web dashboard
+    from maximus.utils.delegate_wallet import process_temp_delegation
+    process_temp_delegation()
+    
+    # Redirect agent's status bar to JSON output
+    from maximus.utils import status_bar as sb_module
+    json_status_bar = JSONStatusBar()
+    sb_module._global_status_bar = json_status_bar
+    
+    # Suppress logger output in JSON mode (we want clean JSON only)
+    from maximus.utils import logger as logger_module
+    
+    class QuietLogger:
+        """Logger that doesn't print anything in JSON mode."""
+        def log_user_query(self, query): pass
+        def log_task_list(self, tasks): pass
+        def log_task_start(self, task): pass
+        def log_task_done(self, task): pass
+        def log_summary(self, answer): pass
+        def _log(self, message): pass
+    
+    # Override the logger
+    logger_module.Logger = QuietLogger
+    
+    agent = Agent(session_id=session_id)
+    
+    # Output ready signal
+    print(json.dumps({"type": "ready", "session_id": session_id}), flush=True)
+    
+    # Read queries from stdin and output JSON responses
+    for line in sys.stdin:
+        try:
+            query = line.strip()
+            if not query:
+                continue
+            
+            # Handle special commands
+            if query == "/clear":
+                clear_memories(session_id)
+                response = {"type": "command", "command": "clear", "message": "💾 Memory cleared"}
+            elif query in ["exit", "quit"]:
+                clear_memories(session_id, silent=True)
+                response = {"type": "exit", "message": "Goodbye!"}
+                print(json.dumps(response), flush=True)
+                break
+            elif query == "/balances":
+                result = execute_balances_command()
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "balances", "result": clean_result}
+            elif query == "/transactions":
+                result = execute_transactions_command()
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "transactions", "result": clean_result}
+            elif query == "/delegate":
+                result = execute_delegate_command()
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "delegate", "result": clean_result}
+            elif query == "/export-delegate":
+                result = execute_export_delegate_command()
+                # Strip ANSI codes for clean JSON output
+                clean_result = strip_ansi_codes(result)
+                response = {"type": "command_result", "command": "export_delegate", "result": clean_result}
+            elif query.startswith("/set-delegation-password "):
+                # Extract password from command
+                password = query.replace("/set-delegation-password ", "").strip()
+                from maximus.utils.delegate_wallet import set_session_password, get_delegate_wallet
+                
+                # Verify password is valid by trying to decrypt delegation
+                delegate = get_delegate_wallet()
+                if delegate.delegation_exists():
+                    config = delegate.get_delegation_info(password)
+                    if config:
+                        set_session_password(password)
+                        response = {"type": "command_result", "command": "set_delegation_password", "result": "✅ Delegation password set successfully"}
+                    else:
+                        response = {"type": "error", "error": "Invalid password"}
+                else:
+                    response = {"type": "error", "error": "No delegation found"}
+            else:
+                # Regular query - run through agent
+                try:
+                    answer = agent.run(query)
+                    response = {"type": "answer", "query": query, "answer": answer}
+                except Exception as e:
+                    response = {"type": "error", "query": query, "error": str(e)}
+            
+            # Output JSON response
+            print(json.dumps(response), flush=True)
+            
+        except Exception as e:
+            error_response = {"type": "error", "error": str(e)}
+            print(json.dumps(error_response), flush=True)
+
+
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Maximus - Autonomous Solana Agent")
+    parser.add_argument('--json', action='store_true', help='Run in JSON mode for programmatic access')
+    args = parser.parse_args()
+    
+    # Run in JSON mode if requested
+    if args.json:
+        run_json_mode()
+        return
+    
     # Generate a unique session ID for this CLI session
     session_id = str(uuid.uuid4())
     

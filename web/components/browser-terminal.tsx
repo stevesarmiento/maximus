@@ -66,7 +66,7 @@ export function BrowserTerminal() {
   return (
     <div className="w-full max-w-5xl mx-auto">
       {/* Browser Window */}
-      <div className="bg-sand-1500 h-[420px] rounded-lg shadow-2xl overflow-hidden border border-sand-1300">
+      <div className="bg-sand-1600/80 backdrop-blur-xl h-[420px] rounded-lg shadow-2xl overflow-hidden border border-sand-1300">
         {/* Browser Chrome */}
         <div className="px-2 py-2">
           <div className="flex items-center gap-2">
@@ -80,7 +80,7 @@ export function BrowserTerminal() {
         </div>
 
         {/* Terminal Content */}
-        <div className="bg-sand-1600 p-8 min-h-[600px] text-[13px] leading-relaxed">
+        <div className="bg-sand-1600/50 p-8 min-h-[600px] text-[13px] leading-relaxed">
           <div className="font-berkeley-mono">
             {/* Logo and Header */}
             <div className="flex items-start gap-4 mb-4">

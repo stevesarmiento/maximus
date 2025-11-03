@@ -11,6 +11,11 @@ Maximus takes complex onchain tasks and turns them into clear, step-by-step exec
 
 It's not just another chatbot. It's an agent that plans ahead, verifies its progress, and keeps iterating until the job is done—whether that's analyzing assets or executing transactions.
 
+**Available as:**
+- 🖥️ **Native Desktop App** - Beautiful Tauri-based native app (macOS, Windows) - [See DESKTOP_APP.md](./DESKTOP_APP.md)
+- 💻 **Terminal CLI** - Fast command-line interface (installation below)
+- 🌐 **Web Dashboard** - Next.js wallet management interface
+
 **Key Capabilities:**
 - **Intelligent Task Planning**: Automatically decomposes complex queries into structured execution steps
 - **Autonomous Execution**: Selects and executes the right tools for analysis and transaction operations

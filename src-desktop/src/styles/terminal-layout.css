@@ -1,0 +1,63 @@
+/* Terminal Layout Styles */
+
+.terminal-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-base);
+  color: var(--text-base);
+  font-family: var(--font-family-mono);
+}
+
+.terminal-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.terminal-content-inner {
+  padding: var(--spacing-lg);
+}
+
+.terminal-status-container {
+  margin-top: var(--spacing-md);
+}
+
+.terminal-input-area {
+  padding: 0 var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+}
+
+.terminal-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin: var(--spacing-md) 0;
+}
+
+.terminal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-base);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  padding: 0;
+}
+
+.terminal-input:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
+}
+
+.terminal-input::placeholder {
+  color: var(--text-weak);
+}
+
+.terminal-hint {
+  margin-top: var(--spacing-md);
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+}
+
