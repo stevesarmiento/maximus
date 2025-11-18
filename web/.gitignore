@@ -41,3 +41,7 @@ next-env.d.ts
 
 # bun
 bun.lockb
+
+# keep the shadcn lib directory
+!lib/
+!lib/**
